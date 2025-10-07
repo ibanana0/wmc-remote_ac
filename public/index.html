@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AC Monitor</title>
+
+    <!-- Meta tags untuk Theme Color (LENGKAP) -->
+    <meta name="color-scheme" content="light dark">
+    
+    <!-- Theme Color untuk Light Mode -->
+    <meta name="theme-color" content="#2D2848" media="(prefers-color-scheme: light)">
+    
+    <!-- Theme Color untuk Dark Mode (warna lebih gelap) -->
+    <meta name="theme-color" content="#1F1F1F" media="(prefers-color-scheme: dark)">
+    
+    <!-- Fallback untuk browser lama -->
+    <meta name="theme-color" content="#2D2848">
+    
+    <!-- iOS Safari Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <!-- Microsoft Edge -->
+    <meta name="msapplication-TileColor" content="#2D2848">
+    <meta name="msapplication-navbutton-color" content="#2D2848">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style type="text/tailwindcss">
+        @theme {
+        --color-purple-theme: #2D2848;
+        --color-black-theme: #1F1F1F;
+        --color-gray-theme: #595959;
+        --color-green-online: #55FF00;
+        --color-red-offline: #FF3300;
+
+        --default-font-family: "Poppins", ui-sans-serif, system-ui, sans-serif;
+    }
+    </style>
+</head>
+<body class=" bg-gradient-to-b from-purple-theme to-black-theme w-auto h-screen text-white">
+    <div class="w-auto h-full flex flex-col justify-center items-center">
+        <div class="md:w-2/5 w-4/5 flex flex-col justify-center items-center gap-9">
+            <div id="main-title" class="flex flex-col items-center justify-center text-center">
+                <h1 class="md:text-6xl text-5xl font-bold">Smrt AC.</h1>
+            </div>
+            <div id="content" class="grid md:gap-7 gap-4 w-full">
+                <div id="status-container" class=" border-white/50 backdrop-blur-4 bg-gradient-to-br from-white/10 to-gray-800/10 border md:rounded-3xl rounded-2xl md:py-4 py-2 md:px-12 px-8 h-auto flex justify-between items-center">
+                    <div class="font-thin">
+                        <p class="md:text-md text-xs"><span id="status-text"></span> with topic:</p>
+                        <p id="topic-text" class="font-semibold md:text-4xl text-xl"> - </p>
+                    </div>
+                    <div>
+                        <div id="status-dot"></div>
+                    </div>
+                </div>
+
+                <div id="remote-temp-container" class="w-full flex justify-center">
+                    <div class="md:text-8xl text-6xl flex md:gap-7 w-3/4 flex-row justify-between items-center md:my-6 my-2">
+                        <p id="remote-temp-value" > - </p>
+                        <p class="font-thin">°C</p>
+                    </div>
+                </div>
+
+                <div id="data-container" class="grid grid-cols-2 md:gap-4 gap-3">
+                    <div id="data-temp-container" class=" border-white/50 backdrop-blur-4 bg-gradient-to-br from-white/10 to-gray-800/10 border md:rounded-3xl rounded-2xl md:p-4 p-3 h-auto flex flex-col justify-center items-center gap-3">
+                        <div class="w-full">
+                            <p class=" text-white/50 md:text-md text-sm">Temperature</p>
+                        </div>
+                        <div class="md:text-5xl text-3xl font-thin flex justify-between w-full">
+                            <p id="temp-value" class="font-semibold"> - </p>
+                            <p>°C</p>
+                        </div>
+                    </div>
+                    <div id="data-humidity-container" class=" border-white/50 backdrop-blur-4 bg-gradient-to-br from-white/10 to-gray-800/10 border md:rounded-3xl rounded-2xl md:p-4 p-3 h-auto flex flex-col justify-between items-center gap-3">
+                        <div class="w-full">
+                            <p class=" text-white/50 md:text-md text-sm">Humidity</p>
+                        </div>
+                        <div class="md:text-5xl text-3xl font-thin flex justify-between w-full">
+                            <p id="humidity-value" class="font-semibold"> - </p>
+                            <p class="font-thin">%</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="controller-container" class=" border-white/50 backdrop-blur-4 bg-gradient-to-br from-white/10 to-gray-800/10 border md:rounded-3xl rounded-2xl md:p-4 p-3 h-auto flex flex-col justify-between items-center md:gap-1 gap-2">
+                    <div class="w-full">
+                        <p class=" text-white/50 md:text-md text-sm">Control</p>
+                    </div>
+                    <div class="w-full h-auto md:px-16 px-8 flex flex-row justify-between items-center">
+                        <div id="power-container" class="flex items-start">
+                            <img src="./images/power-button.svg" alt="power button" onclick="powerHandler()" class="cursor-pointer hover:opacity-50 hover:scale-95 duration-300 md:w-28 w-16">
+                            <div id="power-dot" class="md:w-3 md:h-3 w-2 h-2 bg-green-online rounded-full"></div>
+                        </div>
+                        <div id="temp-controller-container" class="flex flex-col gap-2">
+                            <img src="./images/temp-up.svg" alt="temperature up button" class="cursor-pointer hover:opacity-50 hover:scale-95 duration-300 md:w-32 w-20">
+                            <img src="./images/temp-down.svg" alt="temperature down button" class="cursor-pointer hover:opacity-50 hover:scale-95 duration-300 md:w-32 w-20">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
