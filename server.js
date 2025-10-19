@@ -9,17 +9,16 @@ const MQTT_BROKER = '35.226.15.168';
 const MQTT_PORT = 1883;
 const MQTT_URL = `mqtt://${MQTT_BROKER}:${MQTT_PORT}`;
 const WSS_PORT = 8080;
-const MQTT_TOPIC = 'temp';
+const MQTT_TOPIC_DATA = 'temp';           // topic untuk menerima data dari ESP32
+const MQTT_TOPIC_COMMAND = 'temp/cmd';    // topic untuk mengirim perintah ke ESP32
 
 const username = 'esp32user';
 const password = 'windows10';
 
-// membuat server
 const app = express();
 const server = http.createServer(app);
 app.use(express.static(path.join(__dirname, 'public')));
 
-// mendapatkan ip local --> agar bisa diakses dari luar laptop
 function getLocalIP() {
   const networkInterfaces = os.networkInterfaces();
   const candidates = [];
@@ -27,11 +26,9 @@ function getLocalIP() {
   for (const interfaceName in networkInterfaces) {
     const networkInterface = networkInterfaces[interfaceName];
     for (const network of networkInterface) {
-      // Skip alamat internal
       if (network.internal || network.family !== "IPv4") {
         continue;
       }
-      // Prioritaskan alamat Wi-Fi
       if (interfaceName.toLowerCase().includes("wi-fi")) {
         return network.address;
       }
@@ -41,7 +38,6 @@ function getLocalIP() {
   return candidates.length > 0 ? candidates[0] : "localhost";
 }
 
-// Membuat WebSocket Server
 let wss;
 try {
     wss = new WebSocket.Server({
@@ -51,42 +47,60 @@ try {
     if (error.code === 'EADDRINUSE') {
         console.log('Port sudah digunakan, mohon coba port lain');
     } else {
-	    console.log(`Error: ${error}`);
+      console.log(`Error: ${error}`);
     }
 }
 
 let wsClient = [];
 wss.on('connection', (ws, req) => {
-  // send
   wsClient.push(ws);
   console.log(`\n🟢  Client ${req.socket.remoteAddress} berhasil terhubung`);
 
-  // welcome client
   const welcomeMessage = {
     type: 'welcome',
-    topic: MQTT_TOPIC,
-    message: `Selamat datang di topic '${MQTT_TOPIC}'`,
+    topic: MQTT_TOPIC_DATA,
+    message: `Selamat datang di topic '${MQTT_TOPIC_DATA}'`,
     clientCount: wsClient.length
   };
 
   try {
-    ws.send(JSON.stringify(welcomeMessage));    // diubah jadi string agar bisa dikirim ke client
+    ws.send(JSON.stringify(welcomeMessage));
   } catch (error) {
     console.log(`Error: ${error}`)
     if (error.code === 'ECONNRESET') {
       console.log('Client terhubung, tetapi tidak ada respons dari client');
-    }
-    // error ketika data JSON formatnya salah
-    else if (error.code === 'ERR_INVALID_ARG_TYPE') {
+    } else if (error.code === 'ERR_INVALID_ARG_TYPE') {
       console.log('Data JSON tidak valid');
     }
   }
 
-  // handle message
+  // handle message dari client (perintah AC)
   ws.on('message', (message) => {
     try{
       const data = JSON.parse(message);
       console.log('Message dari client:', data);
+      
+      // Jika message adalah perintah, publish ke MQTT
+      if (data.type === 'perintah') {
+        const commandPayload = {
+          type: 'perintah',
+          command: data.command,
+          timestamp: data.timestamp
+        };
+        
+        mqttClient.publish(
+          MQTT_TOPIC_COMMAND, 
+          JSON.stringify(commandPayload),
+          { qos: 1 },
+          (err) => {
+            if (err) {
+              console.log(`Error publish ke MQTT: ${err}`);
+            } else {
+              console.log(`✅  Perintah '${data.command}' berhasil dikirim ke ESP32`);
+            }
+          }
+        );
+      }
     } catch (error) {
       if (error.code === 'ERR_INVALID_ARG_TYPE') {
         console.log('Data JSON tidak valid');
@@ -96,7 +110,6 @@ wss.on('connection', (ws, req) => {
     }
   })
 
-  // close
   ws.on('close', (code, reason) => {
     console.log(`\n🔴  Client ${req.socket.remoteAddress} terputus`);
     console.log(`Browser client disconnected. Code: ${code}, Reason: ${reason}`);
@@ -104,16 +117,14 @@ wss.on('connection', (ws, req) => {
     console.log(`Active connections: ${wsClient.length}`);
   })
 
-  // error
   ws.on('error', (error) => {
     if (error.code === 'ECONNRESET') {
       console.log('Client terhubung, tetapi tidak ada respons dari client');
     } else {
-	    console.log(`Error: ${error}`)
+      console.log(`Error: ${error}`)
   }})
 })
 
-// menginisialisasi MQTT Client
 console.log('Connecting to MQTT broker...');
 const mqttClient = mqtt.connect(
     MQTT_URL,
@@ -126,31 +137,41 @@ const mqttClient = mqtt.connect(
     }
 );
 
-// connect mqtt client ke topic jika bisa konek
 mqttClient.on('connect', () => {
     console.log('🟢  MQTT client terhubung ke broker');
-    mqttClient.subscribe(MQTT_TOPIC, (err) => {
+    
+    // Subscribe ke topic data
+    mqttClient.subscribe(MQTT_TOPIC_DATA, (err) => {
         if (err) {
-            console.log(`Error: ${err}`)
+            console.log(`Error subscribe topic data: ${err}`)
             process.exit(1);
         }
-        console.log(`🟢  MQTT client berhasil subscribe topic '${MQTT_TOPIC}'`);
-        console.log('🟡  Menunggu data...')
+        console.log(`🟢  MQTT client berhasil subscribe topic '${MQTT_TOPIC_DATA}'`);
     });
+    
+    // Subscribe ke topic command (opsional, untuk konfirmasi)
+    mqttClient.subscribe(MQTT_TOPIC_COMMAND, (err) => {
+        if (err) {
+            console.log(`Error subscribe topic command: ${err}`)
+        } else {
+            console.log(`🟢  MQTT client berhasil subscribe topic '${MQTT_TOPIC_COMMAND}'`);
+        }
+    });
+    
+    console.log('🟡  Menunggu data...')
 });
 
-// mqtt client menerima data dari mqtt broker
 mqttClient.on('message', (topic, message) => {
     try{
         const data = JSON.parse(message);
         console.log(`\nMessage dari MQTT topic '${topic}':\n`, data);
 
-        // mengirim data ke semua client
+        // Kirim data ke semua websocket client
         wsClient.forEach((client, index) => {
             if (client.readyState === WebSocket.OPEN) {
                 try {
                     const wsMessage = {
-                        type: 'data_monitor',
+                        type: data.type || 'data',  // gunakan type dari ESP32
                         data: data,
                         timestamp: new Date().toISOString()
                     };
@@ -160,28 +181,24 @@ mqttClient.on('message', (topic, message) => {
                     if (error.code === 'ERR_INVALID_ARG_TYPE') {
                         console.log('Data JSON tidak valid');
                     }
-                    process.exit(1);
                 }
             } else {
                 console.log(`Client ${index} tidak terhubung`);
             }
         });
 
-        // clean up
         wsClient = wsClient.filter(client => client.readyState === WebSocket.OPEN || client.readyState === WebSocket.CONNECTING);
     } catch (error) {
         console.log(`Error: ${error}`)
         if (error.code === 'ERR_INVALID_ARG_TYPE') {
             console.log('Data JSON tidak valid');
         }
-        process.exit(1);
     }
 });
 
 const PORT = process.env.PORT || WSS_PORT;
 const localIP = getLocalIP();
 
-// jalankan server
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`WebSocket Server Started`);
   console.log(`Local: http://localhost:${PORT}`);
