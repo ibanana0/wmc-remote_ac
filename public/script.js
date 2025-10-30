@@ -4,9 +4,15 @@ class AirConditionerMonitor {
     this.maxReconnectAttempts = 5;
     this.reconnectInterval = 3000;
     this.reconnectAttempts = 0;
-    this.availableTopics = [];
-    this.currentTopic = "temp";
-    this.selectedTopic = "temp";
+    this.acPowerStatus = false;
+    this.remoteTempValue = 25;
+    this.minTemp = 16;
+    this.maxTemp = 30;
+
+    // Device management
+    this.availableDevices = [];
+    this.currentBrand = null;
+    this.currentDeviceId = null;
 
     this.initializeElements();
     this.connectWebsocketServer();
@@ -22,77 +28,243 @@ class AirConditionerMonitor {
     // value element
     this.tempValue = document.getElementById("temp-value");
     this.humidityValue = document.getElementById("humidity-value");
+    this.remoteTempDisplay = document.getElementById("remote-temp-value");
 
-    // topic management elements
-    this.topicSelect = document.getElementById("topic-select");
-    this.addTopicInput = document.getElementById("add-topic-input");
-    this.addTopicBtn = document.getElementById("add-topic-btn");
-
-    // control elements
-    this.powerBtn = document.getElementById("power-btn");
+    // control buttons
+    this.acPowerToggle = document.getElementById("ac-power-toggle");
     this.tempUpBtn = document.getElementById("temp-up-btn");
     this.tempDownBtn = document.getElementById("temp-down-btn");
 
-    this.setupEventListeners();
+    // device selector
+    this.deviceSelector = document.getElementById("device-selector");
+
+    this.setupControlButtons();
+    this.setupDeviceSelector();
+
+    this.updatePowerDot(false);
+    this.updateRemoteTempDisplay();
   }
 
-  setupEventListeners() {
-    // Topic selection
-    if (this.topicSelect) {
-      this.topicSelect.addEventListener("change", (e) => {
-        this.selectedTopic = e.target.value;
-        this.subscribeToTopic(this.selectedTopic);
+  setupDeviceSelector() {
+    if (this.deviceSelector) {
+      this.deviceSelector.addEventListener("change", (e) => {
+        const [brand, deviceId] = e.target.value.split("|");
+        this.currentBrand = brand;
+        this.currentDeviceId = deviceId;
+        this.updateTopicDisplay();
+        console.log(`📱 Switched to ${brand}/${deviceId}`);
+
+        // Reset state when switching devices
+        this.acPowerStatus = false;
+        this.remoteTempValue = 25;
+        this.updatePowerDot(false);
+        this.updateRemoteTempDisplay();
+      });
+    }
+  }
+
+  updateTopicDisplay() {
+    if (this.topicText && this.currentBrand && this.currentDeviceId) {
+      this.topicText.textContent = `ac/${this.currentBrand}/${this.currentDeviceId}`;
+    }
+  }
+
+  updateDeviceList(devices) {
+    this.availableDevices = devices;
+
+    if (!this.deviceSelector) return;
+
+    this.deviceSelector.innerHTML = '<option value="">Select Device</option>';
+
+    devices.forEach((device) => {
+      const option = document.createElement("option");
+      option.value = `${device.brand}|${device.deviceId}`;
+      option.textContent = `${device.brand} - ${device.deviceId}`;
+      this.deviceSelector.appendChild(option);
+    });
+
+    // Auto-select first device if none selected
+    if (devices.length > 0 && !this.currentBrand) {
+      this.currentBrand = devices[0].brand;
+      this.currentDeviceId = devices[0].deviceId;
+      this.deviceSelector.value = `${this.currentBrand}|${this.currentDeviceId}`;
+      this.updateTopicDisplay();
+    }
+  }
+
+  setupControlButtons() {
+    if (this.acPowerToggle) {
+      this.acPowerToggle.addEventListener("click", () => {
+        this.toggleAcPower();
       });
     }
 
-    // Add topic
-    if (this.addTopicBtn) {
-      this.addTopicBtn.addEventListener("click", () => {
-        this.addNewTopic();
-      });
-    }
-
-    if (this.addTopicInput) {
-      this.addTopicInput.addEventListener("keypress", (e) => {
-        if (e.key === "Enter") {
-          this.addNewTopic();
+    if (this.tempUpBtn) {
+      this.tempUpBtn.addEventListener("click", () => {
+        if (this.acPowerStatus) {
+          this.incrementRemoteTemp();
+          this.sendCommand("TEMP_UP");
+        } else {
+          console.log("⚠️  AC harus ON untuk mengubah suhu");
+          this.showTempWarning();
         }
       });
     }
 
-    // Control buttons
-    if (this.powerBtn) {
-      this.powerBtn.addEventListener("click", () =>
-        this.sendControlMessage("power")
-      );
-    }
-    if (this.tempUpBtn) {
-      this.tempUpBtn.addEventListener("click", () =>
-        this.sendControlMessage("temp_up")
-      );
-    }
     if (this.tempDownBtn) {
-      this.tempDownBtn.addEventListener("click", () =>
-        this.sendControlMessage("temp_down")
+      this.tempDownBtn.addEventListener("click", () => {
+        if (this.acPowerStatus) {
+          this.decrementRemoteTemp();
+          this.sendCommand("TEMP_DOWN");
+        } else {
+          console.log("⚠️  AC harus ON untuk mengubah suhu");
+          this.showTempWarning();
+        }
+      });
+    }
+  }
+
+  toggleAcPower() {
+    if (!this.currentBrand || !this.currentDeviceId) {
+      alert("⚠️ Pilih device terlebih dahulu!");
+      return;
+    }
+
+    this.acPowerStatus = !this.acPowerStatus;
+
+    if (this.acPowerStatus) {
+      this.remoteTempValue = 25;
+      this.updateRemoteTempDisplay();
+      console.log("🔄 Suhu direset ke 25°C");
+    }
+
+    const command = this.acPowerStatus ? "ON" : "OFF";
+    this.sendCommand(command);
+
+    this.updatePowerDot(this.acPowerStatus);
+
+    console.log(`⚡ AC Power toggled to: ${command}`);
+  }
+
+  incrementRemoteTemp() {
+    if (this.remoteTempValue < this.maxTemp) {
+      this.remoteTempValue++;
+      this.updateRemoteTempDisplay();
+      console.log(`🔼 Suhu naik ke ${this.remoteTempValue}°C`);
+    } else {
+      console.log(`⚠️  Suhu maksimum ${this.maxTemp}°C tercapai`);
+      this.showMaxTempWarning();
+    }
+  }
+
+  decrementRemoteTemp() {
+    if (this.remoteTempValue > this.minTemp) {
+      this.remoteTempValue--;
+      this.updateRemoteTempDisplay();
+      console.log(`🔽 Suhu turun ke ${this.remoteTempValue}°C`);
+    } else {
+      console.log(`⚠️  Suhu minimum ${this.minTemp}°C tercapai`);
+      this.showMinTempWarning();
+    }
+  }
+
+  updateRemoteTempDisplay() {
+    if (this.remoteTempDisplay) {
+      if (!this.acPowerStatus) {
+        this.remoteTempDisplay.textContent = "-";
+        this.remoteTempDisplay.style.opacity = "0.3";
+      } else {
+        this.remoteTempDisplay.textContent = this.remoteTempValue;
+        this.remoteTempDisplay.style.opacity = "1";
+      }
+    }
+  }
+
+  showTempWarning() {
+    if (this.acPowerToggle) {
+      this.acPowerToggle.classList.add("animate-pulse");
+      setTimeout(() => {
+        this.acPowerToggle.classList.remove("animate-pulse");
+      }, 1000);
+    }
+  }
+
+  showMaxTempWarning() {
+    if (this.tempUpBtn) {
+      this.tempUpBtn.style.opacity = "0.3";
+      setTimeout(() => {
+        this.tempUpBtn.style.opacity = "1";
+      }, 500);
+    }
+  }
+
+  showMinTempWarning() {
+    if (this.tempDownBtn) {
+      this.tempDownBtn.style.opacity = "0.3";
+      setTimeout(() => {
+        this.tempDownBtn.style.opacity = "1";
+      }, 500);
+    }
+  }
+
+  updatePowerDot(isOn) {
+    if (this.powerDot) {
+      this.powerDot.className = `md:w-3 md:h-3 w-2 h-2 rounded-full ${
+        isOn ? "bg-green-online" : "bg-red-offline"
+      }`;
+    }
+
+    this.updateRemoteTempDisplay();
+  }
+
+  sendCommand(command) {
+    if (!this.currentBrand || !this.currentDeviceId) {
+      alert("⚠️ Pilih device terlebih dahulu!");
+      return;
+    }
+
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      const commandMessage = {
+        type: "perintah",
+        brand: this.currentBrand,
+        deviceId: this.currentDeviceId,
+        command: command,
+        temperature: this.remoteTempValue,
+        timestamp: new Date().toISOString(),
+      };
+
+      try {
+        this.ws.send(JSON.stringify(commandMessage));
+        console.log(
+          `🟦  Perintah '${command}' untuk ${this.currentBrand}/${this.currentDeviceId} dikirim`
+        );
+      } catch (error) {
+        console.log(`🟥  Error mengirim perintah: ${error}`);
+      }
+    } else {
+      console.log(
+        "🟥  WebSocket tidak terhubung, tidak dapat mengirim perintah"
       );
+      alert("❌ Tidak terhubung ke server!");
     }
   }
 
   connectWebsocketServer() {
     try {
-      this.ws = new WebSocket(`ws://${window.location.host}`); // samakan dengan yg di server.js
+      this.ws = new WebSocket(`ws://${window.location.host}`);
 
-      // callback function ketika terhubung
       this.ws.onopen = () => {
         console.log("🟩  Koneksi ke WebSocket Server berhasil");
         this.updateStatus(true, "Connected");
         this.reconnectAttempts = 0;
+
+        // Request device list
+        this.ws.send(JSON.stringify({ type: "get_devices" }));
       };
 
-      // callback function ketika ada message
       this.ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data); // mengubah event.data menjadi object JSON
+          const data = JSON.parse(event.data);
           console.log("Berhasil parsing message");
           this.handleMessage(data);
         } catch (error) {
@@ -100,32 +272,20 @@ class AirConditionerMonitor {
         }
       };
 
-      // callback function ketika menutup koneksi
       this.ws.onclose = () => {
         console.log("🟨  Koneksi ke WebSocket Server terputus");
         this.updateStatus(false, "Koneksi WebSocket Server terputus");
         this.attemptReconnect();
       };
 
-      // callback function ketika ada error
       this.ws.onerror = (error) => {
-        if (error.code === "ECONNRESET") {
-          console.log(
-            "🟥  Client terhubung, tetapi tidak ada respons dari WebSocket Server"
-          );
-        } else {
-          console.log(
-            `🟥  Terdapat error ketika menghubungkan ke WebSocket Server: ${error}`
-          );
-        }
+        console.log(
+          `🟥  Terdapat error ketika menghubungkan ke WebSocket Server: ${error}`
+        );
         this.updateStatus(false, "Error");
       };
     } catch (error) {
-      if (error.code === "ECONNREFUSED") {
-        console.log("🟥  WebSocket Server tidak dapat diakses");
-      } else {
-        console.log(`🟥  Terdapat error : ${error}`);
-      }
+      console.log(`🟥  Terdapat error : ${error}`);
     }
   }
 
@@ -146,7 +306,7 @@ class AirConditionerMonitor {
       );
 
       setTimeout(() => {
-        this.connect();
+        this.connectWebsocketServer();
       }, this.reconnectInterval);
     } else {
       this.updateStatus(false, "Cannot connect");
@@ -156,101 +316,100 @@ class AirConditionerMonitor {
   handleMessage(message) {
     switch (message.type) {
       case "welcome":
-        console.log("🎉  " + message.message);
-        this.updateTopic(message.topic);
-        this.updateTopicList(message.availableTopics);
-        this.subscribeToTopic(this.currentTopic);
+        console.log(message.message);
+        if (message.devices && message.devices.length > 0) {
+          this.updateDeviceList(message.devices);
+        }
         break;
-      case "data_monitor":
-        this.updateData(message.data, message.timestamp);
+      case "device_list":
+        if (message.devices) {
+          this.updateDeviceList(message.devices);
+        }
         break;
-      case "subscribe_success":
-        console.log(`✅  Successfully subscribed to: ${message.topic}`);
-        this.currentTopic = message.topic;
-        this.updateTopic(message.topic);
+      case "data":
+        // Only update if message is from currently selected device
+        if (
+          message.brand === this.currentBrand &&
+          message.deviceId === this.currentDeviceId
+        ) {
+          if (message.data && message.data.type === "data") {
+            this.updateData(message.data, message.timestamp);
+          }
+        }
+        // Update device list with new device
+        if (
+          !this.availableDevices.find(
+            (d) => d.brand === message.brand && d.deviceId === message.deviceId
+          )
+        ) {
+          this.availableDevices.push({
+            brand: message.brand,
+            deviceId: message.deviceId,
+          });
+          this.updateDeviceList(this.availableDevices);
+        }
         break;
-      case "topic_list_update":
-        this.updateTopicList(message.availableTopics);
+      case "perintah_status":
+        // Only update if message is from currently selected device
+        if (
+          message.brand === this.currentBrand &&
+          message.deviceId === this.currentDeviceId
+        ) {
+          if (message.data && message.data.type === "perintah_status") {
+            this.handleCommandStatus(message.data);
+          }
+        }
         break;
       default:
         break;
     }
   }
 
-  updateTopic(topicName) {
-    if (this.topicText) {
-      this.topicText.textContent = topicName;
+  handleCommandStatus(data) {
+    console.log(
+      `📥 Status perintah: ${data.status} untuk command: ${data.command}`
+    );
+
+    if (data.power_status !== undefined) {
+      this.acPowerStatus = data.power_status;
+      this.updatePowerDot(this.acPowerStatus);
+
+      if (!this.acPowerStatus) {
+        this.remoteTempValue = 25;
+        this.updateRemoteTempDisplay();
+      }
+    }
+
+    if (data.current_temp !== undefined) {
+      this.remoteTempValue = data.current_temp;
+      this.updateRemoteTempDisplay();
+    }
+
+    if (data.status === "success") {
+      console.log(`✅ ${data.command} berhasil dieksekusi`);
+    } else {
+      console.log(`❌ ${data.command} gagal dieksekusi`);
+      alert(`⚠️ Perintah ${data.command} gagal!`);
     }
   }
 
   updateData(data, timestamp) {
-    // update values
-    this.tempValue.textContent = data.temperature.toFixed(2);
-    this.humidityValue.textContent = data.humidity.toFixed(2);
-  }
-
-  updateTopicList(topics) {
-    this.availableTopics = topics;
-    if (this.topicSelect) {
-      this.topicSelect.innerHTML = "";
-      topics.forEach((topic) => {
-        const option = document.createElement("option");
-        option.value = topic;
-        option.textContent = topic;
-        if (topic === this.currentTopic) {
-          option.selected = true;
-        }
-        this.topicSelect.appendChild(option);
-      });
+    if (data.temperature !== undefined) {
+      this.tempValue.textContent = data.temperature.toFixed(1);
     }
-  }
 
-  // ws message buat subscribe topik
-  subscribeToTopic(topic) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      const message = {
-        action: "subscribe",
-        topic: topic,
-      };
-      this.ws.send(JSON.stringify(message));
-      console.log(`🔔  Subscribing to topic: ${topic}`);
+    if (data.humidity !== undefined) {
+      this.humidityValue.textContent = data.humidity.toFixed(1);
     }
-  }
 
-  // ws message buat nambah topik baru
-  addNewTopic() {
-    const newTopic = this.addTopicInput?.value.trim();
-    if (newTopic && this.ws && this.ws.readyState === WebSocket.OPEN) {
-      const message = {
-        action: "add_topic",
-        topic: newTopic,
-      };
-      this.ws.send(JSON.stringify(message));
-      this.addTopicInput.value = "";
-      console.log(`➕  Adding new topic: ${newTopic}`);
+    if (data.power_status !== undefined) {
+      this.acPowerStatus = data.power_status;
+      this.updatePowerDot(this.acPowerStatus);
     }
-  }
 
-  sendControlMessage(action) {
-    if (
-      this.ws &&
-      this.ws.readyState === WebSocket.OPEN &&
-      this.selectedTopic
-    ) {
-      const controlData = {
-        action: action,
-        timestamp: new Date().toISOString(),
-        // Data buat nanti kode kode buat kontrol tombol ac nyha
-      };
-
-      const message = {
-        action: "publish",
-        topic: this.selectedTopic,
-        message: controlData,
-      };
-
-      this.ws.send(JSON.stringify(message));
-      console.log(`🎮  Sent ${action} to topic: ${this.selectedTopic}`);
+    if (data.current_temp !== undefined) {
+      this.remoteTempValue = data.current_temp;
+      this.updateRemoteTempDisplay();
     }
   }
 }
