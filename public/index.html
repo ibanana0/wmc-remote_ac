@@ -6,98 +6,98 @@
     <title>AC Monitor</title>
 
     <meta name="color-scheme" content="light dark">
-    <meta name="theme-color" content="#2D2848" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#1F1F1F" media="(prefers-color-scheme: dark)">
-    <meta name="theme-color" content="#2D2848">
+    <meta name="theme-color" content="#000000">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="msapplication-TileColor" content="#2D2848">
-    <meta name="msapplication-navbutton-color" content="#2D2848">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style type="text/tailwindcss">
         @theme {
-            --color-purple-theme: #2D2848;
-            --color-black-theme: #1F1F1F;
-            --color-gray-theme: #595959;
-            --color-green-online: #55FF00;
-            --color-red-offline: #FF3300;
-            --default-font-family: "Poppins", ui-sans-serif, system-ui, sans-serif;
+            --default-font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
         }
     </style>
 </head>
-<body class="bg-gradient-to-b from-purple-theme to-black-theme w-auto h-screen text-white">
-    <div class="w-auto h-full flex flex-col justify-center items-center">
-        <div class="md:w-2/5 w-4/5 flex flex-col justify-center items-center gap-9">
-            <div id="main-title" class="flex flex-col items-center justify-center text-center">
-                <h1 class="md:text-6xl text-5xl font-bold">Smrt AC.</h1>
+<body class="bg-black text-white min-h-screen">
+    <div class="max-w-md mx-auto px-6 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-2xl font-light tracking-tight">AC Monitor</h1>
+        </div>
+
+        <!-- Device Selector -->
+        <div class="mb-6">
+            <label for="device-selector" class="text-xs text-gray-400 uppercase tracking-wider mb-2 block">Device</label>
+            <select id="device-selector" class="w-full bg-white text-black px-4 py-3 rounded-none border-none focus:outline-none focus:ring-1 focus:ring-white">
+                <option value="">No devices available</option>
+            </select>
+        </div>
+
+        <!-- Status -->
+        <div class="mb-8 flex items-center justify-between border-t border-b border-gray-800 py-4">
+            <div>
+                <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Status</p>
+                <p id="topic-text" class="text-sm font-light">-</p>
             </div>
-            <div id="content" class="grid md:gap-7 gap-4 w-full">
-                <!-- Device Selector -->
-                <div id="device-selector-container" class="border-white/50 backdrop-blur-4 bg-gradient-to-br from-white/10 to-gray-800/10 border md:rounded-3xl rounded-2xl md:py-4 py-2 md:px-12 px-8">
-                    <label for="device-selector" class="text-white/50 md:text-md text-sm">Select Device</label>
-                    <select id="device-selector" class="w-full mt-2 bg-white/10 border border-white/30 rounded-xl md:px-4 px-3 md:py-2 py-1 text-white md:text-lg text-md">
-                        <option value="">No devices available</option>
-                    </select>
-                </div>
+            <div id="status-dot" class="w-2 h-2 rounded-full bg-gray-600"></div>
+        </div>
 
-                <div id="status-container" class="border-white/50 backdrop-blur-4 bg-gradient-to-br from-white/10 to-gray-800/10 border md:rounded-3xl rounded-2xl md:py-4 py-2 md:px-12 px-8 h-auto flex justify-between items-center">
-                    <div class="font-thin">
-                        <p class="md:text-md text-xs"><span id="status-text"></span> with topic:</p>
-                        <p id="topic-text" class="font-semibold md:text-4xl text-xl"> - </p>
-                    </div>
-                    <div>
-                        <div id="status-dot"></div>
-                    </div>
-                </div>
+        <!-- Remote Temperature -->
+        <div class="mb-8 text-center">
+            <p class="text-xs text-gray-400 uppercase tracking-wider mb-3">Set Temperature</p>
+            <div class="flex items-baseline justify-center gap-2">
+                <p id="remote-temp-value" class="text-7xl font-light tracking-tighter">-</p>
+                <p class="text-3xl font-light text-gray-400">°C</p>
+            </div>
+        </div>
 
-                <div id="remote-temp-container" class="w-full flex justify-center">
-                    <div class="md:text-8xl text-6xl flex md:gap-7 w-3/4 flex-row justify-between items-center md:my-6 my-2">
-                        <p id="remote-temp-value"> - </p>
-                        <p class="font-thin">°C</p>
-                    </div>
+        <!-- Temperature & Humidity -->
+        <div class="grid grid-cols-2 gap-4 mb-8">
+            <div class="border border-gray-800 p-4">
+                <p class="text-xs text-gray-400 uppercase tracking-wider mb-3">Temperature</p>
+                <div class="flex items-baseline gap-1">
+                    <p id="temp-value" class="text-3xl font-light">-</p>
+                    <p class="text-sm text-gray-400">°C</p>
                 </div>
-
-                <div id="data-container" class="grid grid-cols-2 md:gap-4 gap-3">
-                    <div id="data-temp-container" class="border-white/50 backdrop-blur-4 bg-gradient-to-br from-white/10 to-gray-800/10 border md:rounded-3xl rounded-2xl md:p-4 p-3 h-auto flex flex-col justify-center items-center gap-3">
-                        <div class="w-full">
-                            <p class="text-white/50 md:text-md text-sm">Temperature</p>
-                        </div>
-                        <div class="md:text-5xl text-3xl font-thin flex justify-between w-full">
-                            <p id="temp-value" class="font-semibold"> - </p>
-                            <p>°C</p>
-                        </div>
-                    </div>
-                    <div id="data-humidity-container" class="border-white/50 backdrop-blur-4 bg-gradient-to-br from-white/10 to-gray-800/10 border md:rounded-3xl rounded-2xl md:p-4 p-3 h-auto flex flex-col justify-between items-center gap-3">
-                        <div class="w-full">
-                            <p class="text-white/50 md:text-md text-sm">Humidity</p>
-                        </div>
-                        <div class="md:text-5xl text-3xl font-thin flex justify-between w-full">
-                            <p id="humidity-value" class="font-semibold"> - </p>
-                            <p class="font-thin">%</p>
-                        </div>
-                    </div>
+            </div>
+            <div class="border border-gray-800 p-4">
+                <p class="text-xs text-gray-400 uppercase tracking-wider mb-3">Humidity</p>
+                <div class="flex items-baseline gap-1">
+                    <p id="humidity-value" class="text-3xl font-light">-</p>
+                    <p class="text-sm text-gray-400">%</p>
                 </div>
+            </div>
+        </div>
 
-                <div id="controller-container" class="border-white/50 backdrop-blur-4 bg-gradient-to-br from-white/10 to-gray-800/10 border md:rounded-3xl rounded-2xl md:p-4 p-3 h-auto flex flex-col justify-between items-center md:gap-1 gap-2">
-                    <div class="w-full">
-                        <p class="text-white/50 md:text-md text-sm">Control</p>
+        <!-- Controls -->
+        <div class="border border-gray-800 p-6">
+            <p class="text-xs text-gray-400 uppercase tracking-wider mb-6">Control</p>
+            <div class="flex items-center justify-between">
+                <!-- Power Button -->
+                <button id="ac-power-toggle" class="relative group">
+                    <div class="w-16 h-16 border-2 border-white rounded-full flex items-center justify-center hover:bg-white hover:text-black transition-all duration-300">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
                     </div>
-                    <div class="w-full h-auto md:px-16 px-8 flex flex-row justify-between items-center">
-                        <div id="ac-power-toggle" class="flex items-start cursor-pointer hover:opacity-70 hover:scale-95 duration-300">
-                            <img src="./images/power-button.svg" alt="power button" class="md:w-28 w-16">
-                            <div id="power-dot" class="md:w-3 md:h-3 w-2 h-2 rounded-full"></div>
-                        </div>
-                        
-                        <div id="temp-controller-container" class="flex flex-col gap-2">
-                            <img id="temp-up-btn" src="./images/temp-up.svg" alt="temperature up button" class="cursor-pointer hover:opacity-50 hover:scale-95 duration-300 md:w-32 w-20">
-                            <img id="temp-down-btn" src="./images/temp-down.svg" alt="temperature down button" class="cursor-pointer hover:opacity-50 hover:scale-95 duration-300 md:w-32 w-20">
-                        </div>
-                    </div>
+                    <div id="power-dot" class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-gray-600"></div>
+                </button>
+
+                <!-- Temperature Controls -->
+                <div class="flex flex-col gap-3">
+                    <button id="temp-up-btn" class="w-14 h-14 border border-gray-600 hover:border-white hover:bg-white hover:text-black transition-all duration-300 flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                        </svg>
+                    </button>
+                    <button id="temp-down-btn" class="w-14 h-14 border border-gray-600 hover:border-white hover:bg-white hover:text-black transition-all duration-300 flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
                 </div>
             </div>
         </div>

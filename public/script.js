@@ -20,7 +20,6 @@ class AirConditionerMonitor {
 
   initializeElements() {
     // status element
-    this.statusText = document.getElementById("status-text");
     this.statusDot = document.getElementById("status-dot");
     this.topicText = document.getElementById("topic-text");
     this.powerDot = document.getElementById("power-dot");
@@ -209,8 +208,8 @@ class AirConditionerMonitor {
 
   updatePowerDot(isOn) {
     if (this.powerDot) {
-      this.powerDot.className = `md:w-3 md:h-3 w-2 h-2 rounded-full ${
-        isOn ? "bg-green-online" : "bg-red-offline"
+      this.powerDot.className = `absolute -top-1 -right-1 w-3 h-3 rounded-full ${
+        isOn ? "bg-green-500" : "bg-gray-600"
       }`;
     }
 
@@ -290,11 +289,9 @@ class AirConditionerMonitor {
   }
 
   updateStatus(isOnline, statusText) {
-    this.statusDot.className = `md:w-6 md:h-6 w-4 h-4 rounded-full ${
-      isOnline ? "bg-green-online" : "bg-red-offline"
+    this.statusDot.className = `w-2 h-2 rounded-full ${
+      isOnline ? "bg-green-500" : "bg-gray-600"
     }`;
-    this.statusText.textContent = `${statusText}`;
-    this.statusText.className = `font-light`;
   }
 
   attemptReconnect() {
