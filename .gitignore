@@ -1,0 +1,6 @@
+/node_modules
+package-lock.json
+.env*
+*.js
+public/script.js
+public/index.html
