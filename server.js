@@ -5,7 +5,7 @@ const express = require("express");
 const http = require("http");
 const path = require("path");
 
-const MQTT_BROKER = "34.44.126.135";
+const MQTT_BROKER = "34.66.95.23";
 const MQTT_PORT = 1883;
 const MQTT_URL = `mqtt://${MQTT_BROKER}:${MQTT_PORT}`;
 const WSS_PORT = 8080;
