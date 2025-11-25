@@ -65,6 +65,11 @@ class AirConditionerMonitor {
   updateTopicDisplay() {
     if (this.topicText && this.currentBrand && this.currentDeviceId) {
       this.topicText.textContent = `ac/${this.currentBrand}/${this.currentDeviceId}`;
+
+      const protocolInfo = document.getElementById("protocol-info");
+      if (protocolInfo) {
+        protocolInfo.textContent = `Protocol: ${this.currentBrand}`;
+      }
     }
   }
 
@@ -118,6 +123,26 @@ class AirConditionerMonitor {
         } else {
           console.log("⚠️  AC harus ON untuk mengubah suhu");
           this.showTempWarning();
+        }
+      });
+    }
+
+    // TAMBAHAN OPSIONAL: Direct temperature input
+    if (this.remoteTempDisplay) {
+      this.remoteTempDisplay.addEventListener("click", () => {
+        if (this.acPowerStatus) {
+          const newTemp = prompt(
+            `Set temperature (${this.minTemp}-${this.maxTemp}):`,
+            this.remoteTempValue
+          );
+          if (newTemp !== null) {
+            const temp = parseInt(newTemp);
+            if (temp >= this.minTemp && temp <= this.maxTemp) {
+              this.remoteTempValue = temp;
+              this.updateRemoteTempDisplay();
+              this.sendCommand("SET_TEMP", temp);
+            }
+          }
         }
       });
     }
@@ -216,7 +241,7 @@ class AirConditionerMonitor {
     this.updateRemoteTempDisplay();
   }
 
-  sendCommand(command) {
+  sendCommand(command, customTemp = null) {
     if (!this.currentBrand || !this.currentDeviceId) {
       alert("⚠️ Pilih device terlebih dahulu!");
       return;
@@ -228,7 +253,7 @@ class AirConditionerMonitor {
         brand: this.currentBrand,
         deviceId: this.currentDeviceId,
         command: command,
-        temperature: this.remoteTempValue,
+        temperature: customTemp !== null ? customTemp : this.remoteTempValue,
         timestamp: new Date().toISOString(),
       };
 
