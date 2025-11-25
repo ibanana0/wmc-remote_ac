@@ -32,6 +32,7 @@ const char* mqtt_password = "windows10";
 #define LED_PIN 2
 #define SDA_PIN 21
 #define SCL_PIN 22
+#define BUTTON_PIN 4  // <--- PIN TOMBOL FISIK
 
 // OLED
 #define SCREEN_WIDTH 128
@@ -41,6 +42,7 @@ const char* mqtt_password = "windows10";
 // IR Settings
 const uint16_t kCaptureBufferSize = 1024;
 const uint8_t kTimeout = 50;
+const uint8_t kTolerance = 25; // Toleransi sinyal IR
 
 // ===========================
 // OBJEK
@@ -72,10 +74,16 @@ String mqttTopicData = "ac/data";
 String mqttTopicCmd = "ac/cmd";
 String mqttTopicStatus = "ac/status";
 
+// Forward declarations
+void showMessage(const char* line1, const char* line2 = "", const char* line3 = "");
+String typeToString(decode_type_t protocol); // Helper dari library IRremoteESP8266
+void configureAC();
+void handleCommand(String cmd, int temp);
+
 // ===========================
 // FUNGSI OLED
 // ===========================
-void showMessage(const char* line1, const char* line2 = "", const char* line3 = "") {
+void showMessage(const char* line1, const char* line2, const char* line3) {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
@@ -385,18 +393,35 @@ void detectProtocol() {
   Serial.println("Timeout: 30 seconds");
   showMessage("Detect Protocol", "Press remote", "button...");
   
-  irrecv.setTolerance(kTolerance);
+  // Clear buffer IR sebelum mulai
+  irrecv.resume();
+  
   unsigned long startTime = millis();
   bool detected = false;
   
   while (!detected && (millis() - startTime < 30000)) {
+    // Cek tombol fisik untuk cancel jika user berubah pikiran
+    if (digitalRead(BUTTON_PIN) == LOW) {
+      delay(200); // debounce
+      Serial.println("⚠️ Cancelled by user");
+      showMessage("Cancelled", "", "");
+      delay(1000);
+      return; 
+    }
+
     if (irrecv.decode(&results)) {
       decode_type_t protocol = results.decode_type;
       
+      // Filter noise (panjang raw data terlalu pendek)
+      if (results.rawlen < 10) {
+         irrecv.resume();
+         continue;
+      }
+
       if (protocol == UNKNOWN) {
         Serial.println("⚠️ Unknown, retry...");
         showMessage("Unknown Protocol", "Try again...", "");
-        delay(1000);
+        delay(500);
         irrecv.resume();
         continue;
       }
@@ -485,7 +510,8 @@ void printMenu() {
   Serial.println("\n╔════════════════════════════════════╗");
   Serial.println("║   ESP32 AC Control - Simplified   ║");
   Serial.println("╚════════════════════════════════════╝");
-  Serial.println("[1] Detect AC Protocol");
+  Serial.println("[Button 4] Detect AC Protocol");
+  Serial.println("[1] Detect AC Protocol (Serial)");
   Serial.println("[2] Test AC");
   Serial.println("[3] Send Sensor Data");
   Serial.println("[4] Clear Config");
@@ -496,7 +522,7 @@ void printMenu() {
                   currentBrand.c_str(), 
                   typeToString(currentProtocol).c_str());
   } else {
-    Serial.println("Current AC: None (Use [1] to detect)");
+    Serial.println("Current AC: None (Use Button/Press 1 to detect)");
   }
   Serial.println();
 }
@@ -538,11 +564,15 @@ void setup() {
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
   
+  // Setup Button dengan Pull-up internal
+  // Button ditekan = LOW, dilepas = HIGH
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  
   // OLED Init
   Wire.begin(SDA_PIN, SCL_PIN);
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println("❌ OLED failed");
-    while(1);
+    while(1); // Stop here
   }
   
   display.clearDisplay();
@@ -561,7 +591,7 @@ void setup() {
   
   // Initialize hardware
   dht.begin();
-  irrecv.enableIRIn();
+  irrecv.enableIRIn(); // Start receiver
   
   // Network
   setupWiFi();
@@ -572,7 +602,7 @@ void setup() {
   Serial.println("\n✅ System Ready!");
   
   if (currentProtocol == decode_type_t::UNKNOWN) {
-    showMessage("Ready!", "No AC detected", "Use menu [1]");
+    showMessage("Ready!", "No AC detected", "Press Button");
   } else {
     showMessage("Ready!", currentBrand.c_str(), "Configured!");
   }
@@ -591,6 +621,25 @@ void loop() {
   
   unsigned long now = millis();
   
+  // --------------------------
+  // CEK TOMBOL FISIK (GPIO 4)
+  // --------------------------
+  // Karena INPUT_PULLUP, LOW berarti ditekan
+  if (digitalRead(BUTTON_PIN) == LOW) {
+    delay(50); // Debounce sederhana
+    if (digitalRead(BUTTON_PIN) == LOW) {
+      Serial.println("🔘 Button Pressed! Starting Detection...");
+      detectProtocol();
+      
+      // Tunggu tombol dilepas agar tidak looping
+      while(digitalRead(BUTTON_PIN) == LOW) {
+        delay(10);
+      }
+      
+      printMenu(); // Tampilkan menu lagi setelah selesai
+    }
+  }
+
   // Auto-send sensor data
   if (currentProtocol != decode_type_t::UNKNOWN && 
       now - lastDataSend > DATA_SEND_INTERVAL) {
@@ -616,7 +665,7 @@ void loop() {
       case '2': testAC(); break;
       case '3': sendSensorData(); break;
       case '4': clearConfig(); break;
-      default: Serial.println("❌ Invalid"); break;
+      // default: Serial.println("❌ Invalid"); break;
     }
     printMenu();
   }
