@@ -5,7 +5,7 @@ const express = require("express");
 const http = require("http");
 const path = require("path");
 
-const MQTT_BROKER = "34.66.95.23";
+const MQTT_BROKER = "34.171.9.145"; // Update IP sesuai kode ESP32 Anda (jika berubah)
 const MQTT_PORT = 1883;
 const MQTT_URL = `mqtt://${MQTT_BROKER}:${MQTT_PORT}`;
 const WSS_PORT = 8080;
@@ -73,11 +73,6 @@ wss.on("connection", (ws, req) => {
     ws.send(JSON.stringify(welcomeMessage));
   } catch (error) {
     console.log(`Error: ${error}`);
-    if (error.code === "ECONNRESET") {
-      console.log("Client terhubung, tetapi tidak ada respons dari client");
-    } else if (error.code === "ERR_INVALID_ARG_TYPE") {
-      console.log("Data JSON tidak valid");
-    }
   }
 
   ws.on("message", (message) => {
@@ -121,29 +116,16 @@ wss.on("connection", (ws, req) => {
         ws.send(JSON.stringify(deviceList));
       }
     } catch (error) {
-      if (error.code === "ERR_INVALID_ARG_TYPE") {
-        console.log("Data JSON tidak valid");
-      } else {
-        console.log(`Error: ${error}`);
-      }
+      console.log(`Error processing message: ${error}`);
     }
   });
 
   ws.on("close", (code, reason) => {
-    console.log(`\n🔴  Client ${req.socket.remoteAddress} terputus`);
-    console.log(
-      `Browser client disconnected. Code: ${code}, Reason: ${reason}`
-    );
     wsClient = wsClient.filter((client) => client !== ws);
-    console.log(`Active connections: ${wsClient.length}`);
   });
 
   ws.on("error", (error) => {
-    if (error.code === "ECONNRESET") {
-      console.log("Client terhubung, tetapi tidak ada respons dari client");
-    } else {
-      console.log(`Error: ${error}`);
-    }
+    console.log(`WS Error: ${error}`);
   });
 });
 
@@ -159,25 +141,8 @@ const mqttClient = mqtt.connect(MQTT_URL, {
 mqttClient.on("connect", () => {
   console.log("🟢  MQTT client terhubung ke broker");
 
-  mqttClient.subscribe(MQTT_TOPIC_DATA, (err) => {
-    if (err) {
-      console.log(`Error subscribe topic data: ${err}`);
-      process.exit(1);
-    }
-    console.log(
-      `🟢  MQTT client berhasil subscribe topic '${MQTT_TOPIC_DATA}'`
-    );
-  });
-
-  mqttClient.subscribe(MQTT_TOPIC_STATUS, (err) => {
-    if (err) {
-      console.log(`Error subscribe topic status: ${err}`);
-    } else {
-      console.log(
-        `🟢  MQTT client berhasil subscribe topic '${MQTT_TOPIC_STATUS}'`
-      );
-    }
-  });
+  mqttClient.subscribe(MQTT_TOPIC_DATA);
+  mqttClient.subscribe(MQTT_TOPIC_STATUS);
 
   console.log("🟡  Menunggu data dari devices...");
 });
@@ -188,6 +153,8 @@ mqttClient.on("message", (topic, message) => {
 
     // Parse topic: ac/{brand}/{deviceId}/{type}
     const topicParts = topic.split("/");
+    if (topicParts.length < 4) return;
+    
     const brand = topicParts[1];
     const deviceId = topicParts[2];
     const messageType = topicParts[3];
@@ -203,39 +170,21 @@ mqttClient.on("message", (topic, message) => {
     console.log(`\nMessage dari ${brand}/${deviceId} (${messageType}):`, data);
 
     // Kirim data ke semua websocket client
-    wsClient.forEach((client, index) => {
+    wsClient.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
-        try {
-          const wsMessage = {
-            type: data.type || "data",
-            brand: brand,
-            deviceId: deviceId,
-            messageType: messageType,
-            data: data,
-            timestamp: new Date().toISOString(),
-          };
-          client.send(JSON.stringify(wsMessage));
-        } catch (error) {
-          console.log(`Error: ${error}`);
-          if (error.code === "ERR_INVALID_ARG_TYPE") {
-            console.log("Data JSON tidak valid");
-          }
-        }
-      } else {
-        console.log(`Client ${index} tidak terhubung`);
+        const wsMessage = {
+          type: data.type || "data",
+          brand: brand,
+          deviceId: deviceId,
+          messageType: messageType,
+          data: data,
+          timestamp: new Date().toISOString(),
+        };
+        client.send(JSON.stringify(wsMessage));
       }
     });
-
-    wsClient = wsClient.filter(
-      (client) =>
-        client.readyState === WebSocket.OPEN ||
-        client.readyState === WebSocket.CONNECTING
-    );
   } catch (error) {
-    console.log(`Error: ${error}`);
-    if (error.code === "ERR_INVALID_ARG_TYPE") {
-      console.log("Data JSON tidak valid");
-    }
+    console.log(`Error parsing MQTT message: ${error}`);
   }
 });
 
