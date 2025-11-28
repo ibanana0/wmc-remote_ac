@@ -5,11 +5,11 @@ class AirConditionerMonitor {
     this.reconnectInterval = 3000;
     this.reconnectAttempts = 0;
     this.acPowerStatus = false;
-    
-    // --- PERUBAHAN DISINI SESUAI KODE ARDUINO ---
-    this.remoteTempValue = 18; // Default Start Temp (tengah-tengah)
-    this.minTemp = 16;         // Batas Bawah
-    this.maxTemp = 20;         // Batas Atas
+
+    // --- UPDATE SESUAI KODE ARDUINO (18-22°C) ---
+    this.remoteTempValue = 20; // Default Start Temp (tengah-tengah 18-22)
+    this.minTemp = 18; // Batas Bawah
+    this.maxTemp = 22; // Batas Atas
     // --------------------------------------------
 
     // Device management
@@ -45,6 +45,7 @@ class AirConditionerMonitor {
 
     this.updatePowerDot(false);
     this.updateRemoteTempDisplay();
+    this.updateButtonStates();
   }
 
   setupDeviceSelector() {
@@ -52,7 +53,7 @@ class AirConditionerMonitor {
       this.deviceSelector.addEventListener("change", (e) => {
         const value = e.target.value;
         if (!value) return;
-        
+
         const [brand, deviceId] = value.split("|");
         this.currentBrand = brand;
         this.currentDeviceId = deviceId;
@@ -61,9 +62,10 @@ class AirConditionerMonitor {
 
         // Reset state when switching devices
         this.acPowerStatus = false;
-        this.remoteTempValue = 18; // Reset ke 18 saat ganti device
+        this.remoteTempValue = 20; // Reset ke 20 (tengah range 18-22)
         this.updatePowerDot(false);
         this.updateRemoteTempDisplay();
+        this.updateButtonStates();
       });
     }
   }
@@ -84,9 +86,8 @@ class AirConditionerMonitor {
 
     if (!this.deviceSelector) return;
 
-    // Simpan pilihan saat ini agar tidak reset visual selector jika data refresh
     const currentSelection = this.deviceSelector.value;
-    
+
     this.deviceSelector.innerHTML = '<option value="">Select Device</option>';
 
     devices.forEach((device) => {
@@ -96,9 +97,11 @@ class AirConditionerMonitor {
       this.deviceSelector.appendChild(option);
     });
 
-    // Restore selection or Auto-select first
-    if (currentSelection && devices.some(d => `${d.brand}|${d.deviceId}` === currentSelection)) {
-        this.deviceSelector.value = currentSelection;
+    if (
+      currentSelection &&
+      devices.some((d) => `${d.brand}|${d.deviceId}` === currentSelection)
+    ) {
+      this.deviceSelector.value = currentSelection;
     } else if (devices.length > 0 && !this.currentBrand) {
       this.currentBrand = devices[0].brand;
       this.currentDeviceId = devices[0].deviceId;
@@ -116,32 +119,36 @@ class AirConditionerMonitor {
 
     if (this.tempUpBtn) {
       this.tempUpBtn.addEventListener("click", () => {
-        if (this.acPowerStatus) {
-          if (this.remoteTempValue < this.maxTemp) {
-             this.incrementRemoteTemp();
-             this.sendCommand("TEMP_UP");
-          } else {
-             this.showMaxTempWarning();
-          }
-        } else {
+        if (!this.acPowerStatus) {
           console.log("⚠️  AC harus ON untuk mengubah suhu");
           this.showTempWarning();
+          return;
+        }
+
+        if (this.remoteTempValue < this.maxTemp) {
+          this.incrementRemoteTemp();
+          this.sendCommand("TEMP_UP");
+        } else {
+          console.log("⚠️  Suhu sudah maksimal (22°C)");
+          this.showMaxTempWarning();
         }
       });
     }
 
     if (this.tempDownBtn) {
       this.tempDownBtn.addEventListener("click", () => {
-        if (this.acPowerStatus) {
-            if (this.remoteTempValue > this.minTemp) {
-                this.decrementRemoteTemp();
-                this.sendCommand("TEMP_DOWN");
-            } else {
-                this.showMinTempWarning();
-            }
-        } else {
+        if (!this.acPowerStatus) {
           console.log("⚠️  AC harus ON untuk mengubah suhu");
           this.showTempWarning();
+          return;
+        }
+
+        if (this.remoteTempValue > this.minTemp) {
+          this.decrementRemoteTemp();
+          this.sendCommand("TEMP_DOWN");
+        } else {
+          console.log("⚠️  Suhu sudah minimal (18°C)");
+          this.showMinTempWarning();
         }
       });
     }
@@ -151,7 +158,7 @@ class AirConditionerMonitor {
       this.remoteTempDisplay.addEventListener("click", () => {
         if (this.acPowerStatus) {
           const newTemp = prompt(
-            `Set temperature (${this.minTemp}-${this.maxTemp}):`,
+            `Set temperature (${this.minTemp}-${this.maxTemp}°C):`,
             this.remoteTempValue
           );
           if (newTemp !== null) {
@@ -159,14 +166,9 @@ class AirConditionerMonitor {
             if (temp >= this.minTemp && temp <= this.maxTemp) {
               this.remoteTempValue = temp;
               this.updateRemoteTempDisplay();
-              // Note: Karena ESP32 sekarang menggunakan logic Index berdasarkan tombol,
-              // mengirim suhu langsung mungkin memerlukan penyesuaian di sisi ESP32 
-              // jika ingin mendukung "SET_TEMP". 
-              // Untuk saat ini kita kirim manual command atau simulasi loop di ESP.
-              // Namun karena kode ESP32 Anda hanya support ON/OFF/UP/DOWN,
-              // fitur ini hanya visual di web untuk saat ini.
+              this.updateButtonStates();
             } else {
-              alert(`Suhu harus antara ${this.minTemp} - ${this.maxTemp}`);
+              alert(`⚠️ Suhu harus antara ${this.minTemp}-${this.maxTemp}°C`);
             }
           }
         }
@@ -183,15 +185,16 @@ class AirConditionerMonitor {
     this.acPowerStatus = !this.acPowerStatus;
 
     if (this.acPowerStatus) {
-      this.remoteTempValue = 18; // Default start temp sesuai kode Arduino
+      this.remoteTempValue = 20; // Default start temp (tengah 18-22)
       this.updateRemoteTempDisplay();
-      console.log("🔄 Suhu direset ke 18°C");
+      console.log("🔄 Suhu direset ke 20°C");
     }
 
     const command = this.acPowerStatus ? "ON" : "OFF";
     this.sendCommand(command);
 
     this.updatePowerDot(this.acPowerStatus);
+    this.updateButtonStates();
 
     console.log(`⚡ AC Power toggled to: ${command}`);
   }
@@ -200,16 +203,18 @@ class AirConditionerMonitor {
     if (this.remoteTempValue < this.maxTemp) {
       this.remoteTempValue++;
       this.updateRemoteTempDisplay();
+      this.updateButtonStates();
       console.log(`🔼 Suhu naik ke ${this.remoteTempValue}°C`);
-    } 
+    }
   }
 
   decrementRemoteTemp() {
     if (this.remoteTempValue > this.minTemp) {
       this.remoteTempValue--;
       this.updateRemoteTempDisplay();
+      this.updateButtonStates();
       console.log(`🔽 Suhu turun ke ${this.remoteTempValue}°C`);
-    } 
+    }
   }
 
   updateRemoteTempDisplay() {
@@ -217,15 +222,125 @@ class AirConditionerMonitor {
       if (!this.acPowerStatus) {
         this.remoteTempDisplay.textContent = "-";
         this.remoteTempDisplay.style.opacity = "0.3";
+        this.remoteTempDisplay.style.color = "white";
+        this.removeLimitWarning();
       } else {
         this.remoteTempDisplay.textContent = this.remoteTempValue;
         this.remoteTempDisplay.style.opacity = "1";
-        
-        // Visual feedback jika mencapai batas
-        if(this.remoteTempValue >= this.maxTemp) this.remoteTempDisplay.style.color = "#ef4444"; // Red
-        else if(this.remoteTempValue <= this.minTemp) this.remoteTempDisplay.style.color = "#3b82f6"; // Blue
-        else this.remoteTempDisplay.style.color = "white";
+
+        // Visual feedback untuk batas suhu
+        if (this.remoteTempValue >= this.maxTemp) {
+          this.remoteTempDisplay.style.color = "#ef4444"; // Red - MAX
+          this.remoteTempDisplay.style.fontWeight = "bold";
+          this.addLimitWarning("MAX");
+        } else if (this.remoteTempValue <= this.minTemp) {
+          this.remoteTempDisplay.style.color = "#3b82f6"; // Blue - MIN
+          this.remoteTempDisplay.style.fontWeight = "bold";
+          this.addLimitWarning("MIN");
+        } else {
+          this.remoteTempDisplay.style.color = "#10b981"; // Green - Normal
+          this.remoteTempDisplay.style.fontWeight = "normal";
+          this.removeLimitWarning();
+        }
       }
+    }
+    this.updateButtonStatus();
+  }
+
+  updateButtonStates() {
+    if (!this.tempUpBtn || !this.tempDownBtn) return;
+
+    if (!this.acPowerStatus) {
+      this.tempUpBtn.disabled = true;
+      this.tempDownBtn.disabled = true;
+      this.tempUpBtn.style.opacity = "0.3";
+      this.tempDownBtn.style.opacity = "0.3";
+      this.tempUpBtn.style.cursor = "not-allowed";
+      this.tempDownBtn.style.cursor = "not-allowed";
+      return;
+    }
+
+    // Disable tombol UP jika sudah di suhu MAX (22°C)
+    if (this.remoteTempValue >= this.maxTemp) {
+      this.tempUpBtn.disabled = true;
+      this.tempUpBtn.style.opacity = "0.3";
+      this.tempUpBtn.style.cursor = "not-allowed";
+    } else {
+      this.tempUpBtn.disabled = false;
+      this.tempUpBtn.style.opacity = "1";
+      this.tempUpBtn.style.cursor = "pointer";
+    }
+
+    // Disable tombol DOWN jika sudah di suhu MIN (18°C)
+    if (this.remoteTempValue <= this.minTemp) {
+      this.tempDownBtn.disabled = true;
+      this.tempDownBtn.style.opacity = "0.3";
+      this.tempDownBtn.style.cursor = "not-allowed";
+    } else {
+      this.tempDownBtn.disabled = false;
+      this.tempDownBtn.style.opacity = "1";
+      this.tempDownBtn.style.cursor = "pointer";
+    }
+  }
+
+  addLimitWarning(type) {
+    const container = document.getElementById("temp-warning-container");
+    if (!container) return;
+
+    let warningHTML = "";
+
+    if (type === "MAX") {
+      warningHTML = `
+        <div class="inline-flex items-center gap-2 px-3 py-1 bg-red-500/20 border border-red-500 rounded-full text-xs text-red-400 animate-pulse">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+          <span class="font-medium">MAX LIMIT 22°C</span>
+        </div>
+      `;
+    } else if (type === "MIN") {
+      warningHTML = `
+        <div class="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 border border-blue-500 rounded-full text-xs text-blue-400 animate-pulse">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+          <span class="font-medium">MIN LIMIT 18°C</span>
+        </div>
+      `;
+    }
+
+    container.innerHTML = warningHTML;
+  }
+
+  removeLimitWarning() {
+    const container = document.getElementById("temp-warning-container");
+    if (container) {
+      container.innerHTML = "";
+    }
+  }
+
+  updateButtonStatus() {
+    const statusElement = document.getElementById("button-status");
+    const lastCommandElement = document.getElementById("last-command");
+
+    if (!statusElement) return;
+
+    if (!this.acPowerStatus) {
+      statusElement.textContent = "OFF";
+      statusElement.className = "text-gray-600";
+      if (lastCommandElement) lastCommandElement.textContent = "AC Power: OFF";
+    } else if (this.remoteTempValue >= this.maxTemp) {
+      statusElement.textContent = "MAX 22°C";
+      statusElement.className = "text-red-400";
+      if (lastCommandElement) lastCommandElement.textContent = "At Maximum";
+    } else if (this.remoteTempValue <= this.minTemp) {
+      statusElement.textContent = "MIN 18°C";
+      statusElement.className = "text-blue-400";
+      if (lastCommandElement) lastCommandElement.textContent = "At Minimum";
+    } else {
+      statusElement.textContent = `${this.remoteTempValue}°C`;
+      statusElement.className = "text-green-400";
+      if (lastCommandElement) lastCommandElement.textContent = "Ready";
     }
   }
 
@@ -240,30 +355,31 @@ class AirConditionerMonitor {
 
   showMaxTempWarning() {
     if (this.tempUpBtn) {
-      this.tempUpBtn.style.opacity = "0.3";
+      this.tempUpBtn.classList.add("animate-shake");
       setTimeout(() => {
-        this.tempUpBtn.style.opacity = "1";
-      }, 200);
+        this.tempUpBtn.classList.remove("animate-shake");
+      }, 300);
     }
   }
 
   showMinTempWarning() {
     if (this.tempDownBtn) {
-      this.tempDownBtn.style.opacity = "0.3";
+      this.tempDownBtn.classList.add("animate-shake");
       setTimeout(() => {
-        this.tempDownBtn.style.opacity = "1";
-      }, 200);
+        this.tempDownBtn.classList.remove("animate-shake");
+      }, 300);
     }
   }
 
   updatePowerDot(isOn) {
     if (this.powerDot) {
-      this.powerDot.className = `absolute -top-1 -right-1 w-3 h-3 rounded-full ${
+      this.powerDot.className = `absolute top-0 right-0 w-4 h-4 rounded-full ${
         isOn ? "bg-green-500" : "bg-gray-600"
-      }`;
+      } border-2 border-gray-900 transition-colors duration-300 shadow`;
     }
 
     this.updateRemoteTempDisplay();
+    this.updateButtonStates();
   }
 
   sendCommand(command, customTemp = null) {
@@ -284,6 +400,7 @@ class AirConditionerMonitor {
 
       try {
         this.ws.send(JSON.stringify(commandMessage));
+        console.log(`📤 Command sent: ${command} (${this.remoteTempValue}°C)`);
       } catch (error) {
         console.log(`🟥  Error mengirim perintah: ${error}`);
       }
@@ -336,20 +453,33 @@ class AirConditionerMonitor {
   attemptReconnect() {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
+      console.log(
+        `🔄 Reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}...`
+      );
       setTimeout(() => {
         this.connectWebsocketServer();
       }, this.reconnectInterval);
+    } else {
+      console.log("❌ Max reconnect attempts reached");
     }
   }
 
   handleMessage(message) {
     switch (message.type) {
       case "welcome":
-      case "device_list":
+        console.log("👋 Welcome message received");
         if (message.devices) {
           this.updateDeviceList(message.devices);
         }
         break;
+
+      case "device_list":
+        console.log("📋 Device list received");
+        if (message.devices) {
+          this.updateDeviceList(message.devices);
+        }
+        break;
+
       case "data":
         if (
           message.brand === this.currentBrand &&
@@ -359,12 +489,21 @@ class AirConditionerMonitor {
             this.updateData(message.data, message.timestamp);
           }
         }
-        // Update list if new device appears
-        if (!this.availableDevices.find(d => d.brand === message.brand && d.deviceId === message.deviceId)) {
-           this.availableDevices.push({ brand: message.brand, deviceId: message.deviceId });
-           this.updateDeviceList(this.availableDevices);
+
+        // Add new device if not in list
+        if (
+          !this.availableDevices.find(
+            (d) => d.brand === message.brand && d.deviceId === message.deviceId
+          )
+        ) {
+          this.availableDevices.push({
+            brand: message.brand,
+            deviceId: message.deviceId,
+          });
+          this.updateDeviceList(this.availableDevices);
         }
         break;
+
       case "perintah_status":
         if (
           message.brand === this.currentBrand &&
@@ -375,22 +514,26 @@ class AirConditionerMonitor {
           }
         }
         break;
+
+      default:
+        console.log(`📨 Unknown message type: ${message.type}`);
     }
   }
 
   handleCommandStatus(data) {
-    console.log(`📥 Status: ${data.status}, Command: ${data.command}, Power: ${data.power_status}, Temp: ${data.current_temp}`);
+    console.log(
+      `📥 Status: ${data.status}, Command: ${data.command}, Power: ${data.power_status}, Temp: ${data.current_temp}`
+    );
 
-    // Sinkronisasi status Power dari ESP32
     if (data.power_status !== undefined) {
       this.acPowerStatus = data.power_status;
       this.updatePowerDot(this.acPowerStatus);
     }
 
-    // Sinkronisasi Temperature dari ESP32 (Source of Truth)
     if (data.current_temp !== undefined) {
       this.remoteTempValue = data.current_temp;
       this.updateRemoteTempDisplay();
+      this.updateButtonStates();
     }
 
     if (data.status !== "success") {
@@ -402,18 +545,26 @@ class AirConditionerMonitor {
     if (data.temperature !== undefined) {
       this.tempValue.textContent = data.temperature.toFixed(1);
     }
+
     if (data.humidity !== undefined) {
       this.humidityValue.textContent = data.humidity.toFixed(1);
     }
+
     if (data.power_status !== undefined) {
       this.acPowerStatus = data.power_status;
       this.updatePowerDot(this.acPowerStatus);
     }
+
     if (data.current_temp !== undefined) {
       this.remoteTempValue = data.current_temp;
       this.updateRemoteTempDisplay();
+      this.updateButtonStates();
     }
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => new AirConditionerMonitor());
+// Initialize on DOM ready
+document.addEventListener(
+  "DOMContentLoaded",
+  () => new AirConditionerMonitor()
+);

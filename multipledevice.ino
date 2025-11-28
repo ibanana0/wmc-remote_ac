@@ -108,7 +108,7 @@ TombolIR currentDeviceButtons[MAX_BUTTONS_PER_DEVICE];
 // STATE & TIMERS
 // ===========================
 bool powerStatus = false;
-int currentTemp = 18; // Default start temp (tengah-tengah 16-20)
+int currentTemp = 20; // Default start temp (tengah-tengah 18-22)
 
 // Timers
 unsigned long lastDataSend = 0;
@@ -123,11 +123,11 @@ bool autoRecordMode = false;
 const char* autoRecordNames[7] = {
   "ON",         // Index 0
   "OFF",        // Index 1
-  "TEMP_16",    // Index 2
-  "TEMP_17",    // Index 3
-  "TEMP_18",    // Index 4
-  "TEMP_19",    // Index 5
-  "TEMP_20"     // Index 6
+  "TEMP_18",    // Index 2
+  "TEMP_19",    // Index 3
+  "TEMP_20",    // Index 4
+  "TEMP_21",    // Index 5
+  "TEMP_22"     // Index 6
 };
 
 
@@ -565,18 +565,18 @@ void handleCommand(String command, int temp) {
   /* MAPPING INDEX:
      0: ON
      1: OFF
-     2: TEMP_16
-     3: TEMP_17
-     4: TEMP_18
-     5: TEMP_19
-     6: TEMP_20
+     2: TEMP_18
+     3: TEMP_19
+     4: TEMP_20
+     5: TEMP_21
+     6: TEMP_22
   */
 
   if (command == "ON") {
     if (devices[currentDeviceIndex].buttonCount > 0) {
       powerStatus = true;
-      // Jangan reset temp ke 25, biarkan temp terakhir atau default 18
-      if (currentTemp < 16 || currentTemp > 20) currentTemp = 18; 
+      // Jangan reset temp ke 25, biarkan temp terakhir atau default 20
+      if (currentTemp < 18 || currentTemp > 22) currentTemp = 20; 
       digitalWrite(LED_PIN, HIGH);
       sendIRButton(0); // Kirim sinyal ON
       success = true;
@@ -592,15 +592,10 @@ void handleCommand(String command, int temp) {
       oledMsg1 = "AC OFF";
     }
   } else if (command == "TEMP_UP" && powerStatus) {
-    // Batas Max sekarang 20
-    if (currentTemp < 20) {
+    // Batas Max sekarang 22
+    if (currentTemp < 22) {
       currentTemp++;
-      
-      // Hitung index tombol berdasarkan suhu
-      // Index 2 adalah 16 derajat.
-      // Rumus: Index = (Suhu - 16) + 2
-      // Contoh: Suhu 17 -> (17-16)+2 = 3. Benar.
-      int btnIndex = (currentTemp - 16) + 2;
+      int btnIndex = (currentTemp - 18) + 2;
 
       if (devices[currentDeviceIndex].buttonCount > btnIndex) {
         sendIRButton(btnIndex);
@@ -610,17 +605,17 @@ void handleCommand(String command, int temp) {
       }
     } else {
         oledMsg1 = "Max Temp";
-        oledMsg2 = "Limit: 20 C";
+        oledMsg2 = "Limit: 22 C";
         showOLEDMessage(oledMsg1.c_str(), oledMsg2.c_str(), "");
         delay(1000);
     }
   } else if (command == "TEMP_DOWN" && powerStatus) {
-    // Batas Min sekarang 16
-    if (currentTemp > 16) {
+    // Batas Min sekarang 18
+    if (currentTemp > 18) {
       currentTemp--;
       
       // Rumus sama: Index = (Suhu - 16) + 2
-      int btnIndex = (currentTemp - 16) + 2;
+      int btnIndex = (currentTemp - 18) + 2;
 
       if (devices[currentDeviceIndex].buttonCount > btnIndex) {
         sendIRButton(btnIndex);
@@ -630,7 +625,7 @@ void handleCommand(String command, int temp) {
       }
     } else {
         oledMsg1 = "Min Temp";
-        oledMsg2 = "Limit: 16 C";
+        oledMsg2 = "Limit: 18 C";
         showOLEDMessage(oledMsg1.c_str(), oledMsg2.c_str(), "");
         delay(1000);
     }
@@ -755,13 +750,13 @@ void autoRecordIR() {
   Serial.println("Akan merekam urutan:");
   Serial.println("1. ON");
   Serial.println("2. OFF");
-  Serial.println("3. TEMP 16 C");
-  Serial.println("4. TEMP 17 C");
-  Serial.println("5. TEMP 18 C");
-  Serial.println("6. TEMP 19 C");
-  Serial.println("7. TEMP 20 C");
+  Serial.println("3. TEMP 18 C");
+  Serial.println("4. TEMP 19 C");
+  Serial.println("5. TEMP 20 C");
+  Serial.println("6. TEMP 21 C");
+  Serial.println("7. TEMP 22 C");
   
-  showOLEDMessage("Auto Record Mode", "Buttons: 7", "Range: 16-20C");
+  showOLEDMessage("Auto Record Mode", "Buttons: 7", "Range: 18-22C");
   delay(2000);
   
   autoRecordMode = true;
@@ -902,7 +897,7 @@ void printMenu() {
   Serial.println("[6] Send Test IR");
   Serial.println("[7] Read & Send DHT22 Data");
   Serial.println("[8] Clear All Data");
-  Serial.println("[9] Auto-Record 7 Buttons (16-20C)"); // Menu text update
+  Serial.println("[9] Auto-Record 7 Buttons (18-22C)");
   Serial.println("\n[BUTTON GPIO4] Auto-Record 7 Buttons");
   Serial.println();
 
