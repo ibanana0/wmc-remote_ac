@@ -189,10 +189,10 @@ mqttClient.on("message", (topic, message) => {
 });
 
 const PORT = process.env.PORT || WSS_PORT;
-const localIP = getLocalIP();
+const HOST = process.env.HOST || "0.0.0.0";
 
-server.listen(PORT, "0.0.0.0", () => {
+server.listen(PORT, HOST, () => {
   console.log(`WebSocket Server Started`);
   console.log(`Local: http://localhost:${PORT}`);
-  console.log(`Network: http://${localIP}:${PORT}`);
+  console.log(`Listening on http://${HOST}:${PORT}`);
 });

@@ -410,38 +410,48 @@ class AirConditionerMonitor {
   }
 
   connectWebsocketServer() {
-    try {
-      this.ws = new WebSocket(`ws://${window.location.host}`);
+      try {
+        const isProduction = window.location.hostname.includes("railway.app");
+        const protocol =
+          window.location.protocol === "https:" || isProduction
+            ? "wss:"
+            : "ws:";
+        const wsUrl = `${protocol}//${window.location.host}`;
 
-      this.ws.onopen = () => {
-        console.log("🟩  Koneksi ke WebSocket Server berhasil");
-        this.updateStatus(true, "Connected");
-        this.reconnectAttempts = 0;
-        this.ws.send(JSON.stringify({ type: "get_devices" }));
-      };
+        console.log(`🔗 Connecting to: ${wsUrl}`);
+        this.ws = new WebSocket(wsUrl);
 
-      this.ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          this.handleMessage(data);
-        } catch (error) {
-          console.log(`🟥  Terdapat error ketika parsing message: ${error}`);
-        }
-      };
+        this.ws.onopen = () => {
+          console.log("🟩  Koneksi ke WebSocket Server berhasil");
+          this.updateStatus(true, "Connected");
+          this.reconnectAttempts = 0;
 
-      this.ws.onclose = () => {
-        console.log("🟨  Koneksi ke WebSocket Server terputus");
-        this.updateStatus(false, "Disconnect");
-        this.attemptReconnect();
-      };
+          // Request device list
+          this.ws.send(JSON.stringify({ type: "get_devices" }));
+        };
 
-      this.ws.onerror = (error) => {
-        console.log(`🟥  WebSocket Error`);
-        this.updateStatus(false, "Error");
-      };
-    } catch (error) {
-      console.log(`🟥  Terdapat error : ${error}`);
-    }
+        this.ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            this.handleMessage(data);
+          } catch (error) {
+            console.log(`🟥  Terdapat error ketika parsing message: ${error}`);
+          }
+        };
+
+        this.ws.onclose = () => {
+          console.log("🟨  Koneksi ke WebSocket Server terputus");
+          this.updateStatus(false, "Disconnect");
+          this.attemptReconnect();
+        };
+
+        this.ws.onerror = (error) => {
+          console.log(`🟥  WebSocket Error`);
+          this.updateStatus(false, "Error");
+        };
+      } catch (error) {
+        console.log(`🟥  Terdapat error : ${error}`);
+      }
   }
 
   updateStatus(isOnline, statusText) {
