@@ -67,7 +67,7 @@ class AirConditionerMonitor {
 
     if (!confirmed) return;
 
-    // Send delete command to server
+    // Send delete command ke server
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       const deleteMessage = {
         type: "delete_device",
@@ -115,13 +115,13 @@ class AirConditionerMonitor {
 
   setupDeviceSelector() {
     if (this.deviceSelector) {
-      // TAMBAHAN: Request device list ketika dropdown diklik/difokuskan
+      // Request device list ketika dropdown diklik/difokuskan
       this.deviceSelector.addEventListener("focus", () => {
         console.log("📋 Requesting device list from ESP32...");
         this.requestDeviceListFromESP32();
       });
 
-      // TAMBAHAN: Handle device selection change
+      // Handle device selection change
       this.deviceSelector.addEventListener("change", (e) => {
         const selectedValue = e.target.value;
 
@@ -131,7 +131,7 @@ class AirConditionerMonitor {
         } else {
           const [brand, deviceId] = selectedValue.split("|");
 
-          // TAMBAHAN: Kirim perintah switch device ke ESP32
+          // Kirim perintah switch device ke ESP32
           this.switchDeviceOnESP32(brand, deviceId);
 
           this.currentBrand = brand;
@@ -144,7 +144,7 @@ class AirConditionerMonitor {
           `📱 Switched to ${this.currentBrand}/${this.currentDeviceId}`
         );
 
-        // Reset state when switching devices
+        // Reset state ketika switching devices
         this.acPowerStatus = false;
         this.remoteTempValue = 18;
         this.updatePowerDot(false);
@@ -153,7 +153,7 @@ class AirConditionerMonitor {
     }
   }
 
-  // TAMBAHAN: Request device list dari ESP32
+  // Request device list dari ESP32
   requestDeviceListFromESP32() {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       const requestMessage = {
@@ -165,7 +165,7 @@ class AirConditionerMonitor {
         this.ws.send(JSON.stringify(requestMessage));
         console.log("📤 Request device list sent to ESP32");
 
-        // ✅ TAMBAHAN: Retry setelah 2 detik jika tidak ada response
+        // Retry setelah 2 detik jika tidak ada response
         setTimeout(() => {
           if (this.availableDevices.length === 0) {
             console.log("⚠️ No devices received, retrying...");
@@ -178,7 +178,7 @@ class AirConditionerMonitor {
     }
   }
 
-  // TAMBAHAN: Switch device di ESP32
+  // Switch device di ESP32
   switchDeviceOnESP32(brand, deviceId) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       const switchMessage = {
@@ -231,13 +231,13 @@ class AirConditionerMonitor {
     ) {
       this.deviceSelector.value = currentSelection;
     } else if (devices.length > 0 && !this.currentBrand) {
-      // Auto-select first device if none selected
+      // Auto pilih first device kalo gada yang dipilih
       this.currentBrand = devices[0].brand;
       this.currentDeviceId = devices[0].deviceId;
       this.deviceSelector.value = `${this.currentBrand}|${this.currentDeviceId}`;
       this.updateTopicDisplay();
 
-      // TAMBAHAN: Auto switch ke device pertama di ESP32
+      // Auto switch ke device pertama di ESP32
       this.switchDeviceOnESP32(this.currentBrand, this.currentDeviceId);
     } else if (devices.length === 0) {
       // No devices available
@@ -248,8 +248,6 @@ class AirConditionerMonitor {
 
     this.updateDeleteButtonState();
   }
-
-  // ... (sisa kode sama seperti sebelumnya)
 
   setupControlButtons() {
     if (this.acPowerToggle) {
@@ -426,7 +424,7 @@ class AirConditionerMonitor {
         // Request device list
         this.ws.send(JSON.stringify({ type: "get_devices" }));
 
-        // TAMBAHAN: Request device list dari ESP32 juga
+        // Request device list dari ESP32 juga
         setTimeout(() => {
           this.requestDeviceListFromESP32();
         }, 500);
@@ -495,7 +493,7 @@ class AirConditionerMonitor {
         }
         break;
       case "data":
-        // Only update if message is from currently selected device
+        // Hanya update jika message dari device yang sedang dipilih
         if (
           message.brand === this.currentBrand &&
           message.deviceId === this.currentDeviceId
@@ -518,7 +516,7 @@ class AirConditionerMonitor {
         }
         break;
       case "perintah_status":
-        // Only update if message is from currently selected device
+        // Hanya proses jika message dari device yang sedang dipilih
         if (
           message.brand === this.currentBrand &&
           message.deviceId === this.currentDeviceId

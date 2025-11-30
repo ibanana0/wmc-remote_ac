@@ -22,13 +22,13 @@ const app = express();
 const server = http.createServer(app);
 app.use(express.static(path.join(__dirname, "public")));
 
-// Track active devices
+// Track active device
 let activeDevices = new Map();
 
 // Device timeout (30 detik)
 const DEVICE_TIMEOUT = 5 * 60 * 1000;
 
-// Cleanup inactive devices
+// Cleanup inactive device
 function cleanupInactiveDevices() {
   const now = Date.now();
   let removedCount = 0;
@@ -54,7 +54,7 @@ function cleanupInactiveDevices() {
   }
 }
 
-// Broadcast device list to all connected clients
+// Broadcast device list ke semua connected clients
 function broadcastDeviceList() {
   const deviceList = {
     type: "device_list",
@@ -72,7 +72,7 @@ function broadcastDeviceList() {
   });
 }
 
-// Run cleanup every 10 seconds
+// Run cleanup setiap 10 seconds
 setInterval(cleanupInactiveDevices, 10000);
 
 function getLocalIP() {
@@ -130,7 +130,7 @@ wss.on("connection", (ws, req) => {
     }
   }
 
-  // ✅ SEMUA HANDLER MESSAGE ADA DI SINI (DALAM CONNECTION HANDLER)
+  // Hndler Message dari client
   ws.on("message", (message) => {
     try {
       const data = JSON.parse(message);
@@ -228,7 +228,7 @@ wss.on("connection", (ws, req) => {
         const deviceId = data.deviceId || "unknown";
         const deviceKey = `${brand}/${deviceId}`;
 
-        // Remove from server's active devices
+        // Remove dari server active devices
         activeDevices.delete(deviceKey);
         console.log(`🗑️  Device ${deviceKey} removed from server`);
 
@@ -328,7 +328,7 @@ mqttClient.on("connect", () => {
     }
   });
 
-  // PERBAIKAN: Subscribe ke broadcast registry
+  // Subscribe ke broadcast registry
   mqttClient.subscribe("ac/broadcast/registry", (err) => {
     if (err) {
       console.log(`Error subscribe topic broadcast registry: ${err}`);
@@ -394,7 +394,6 @@ mqttClient.on("message", (topic, message) => {
     // Handle broadcast commands
     if (topic === "ac/broadcast/cmd") {
       console.log("📢 Broadcast command received:", data);
-      // Server tidak perlu handle ini, ini untuk ESP32
       return;
     }
 
