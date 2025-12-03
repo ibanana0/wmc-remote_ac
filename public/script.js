@@ -5,9 +5,9 @@ class AirConditionerMonitor {
     this.reconnectInterval = 3000;
     this.reconnectAttempts = 0;
     this.acPowerStatus = false;
-    this.remoteTempValue = 25;
-    this.minTemp = 16;
-    this.maxTemp = 30;
+    this.remoteTempValue = 18;
+    this.minTemp = 18;
+    this.maxTemp = 22;
 
     // Device management
     this.availableDevices = [];
@@ -36,35 +36,172 @@ class AirConditionerMonitor {
 
     // device selector
     this.deviceSelector = document.getElementById("device-selector");
+    this.deleteDeviceBtn = document.getElementById("delete-device-btn");
 
     this.setupControlButtons();
     this.setupDeviceSelector();
+    this.setupDeleteButton();
 
     this.updatePowerDot(false);
     this.updateRemoteTempDisplay();
   }
 
+  setupDeleteButton() {
+    if (this.deleteDeviceBtn) {
+      this.deleteDeviceBtn.addEventListener("click", () => {
+        this.deleteCurrentDevice();
+      });
+    }
+  }
+
+  deleteCurrentDevice() {
+    if (!this.currentBrand || !this.currentDeviceId) {
+      alert("⚠️ Pilih device terlebih dahulu!");
+      return;
+    }
+
+    const deviceName = `${this.currentBrand}/${this.currentDeviceId}`;
+    const confirmed = confirm(
+      `⚠️ Hapus device "${deviceName}"?\n\nIni akan menghapus:\n- Data di web interface\n- Data di ESP32 (device akan restart)\n\nLanjutkan?`
+    );
+
+    if (!confirmed) return;
+
+    // Send delete command ke server
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      const deleteMessage = {
+        type: "delete_device",
+        brand: this.currentBrand,
+        deviceId: this.currentDeviceId,
+        timestamp: new Date().toISOString(),
+      };
+
+      try {
+        this.ws.send(JSON.stringify(deleteMessage));
+        console.log(`🗑️  Delete request sent for ${deviceName}`);
+
+        // Reset current device
+        this.currentBrand = null;
+        this.currentDeviceId = null;
+        this.acPowerStatus = false;
+        this.remoteTempValue = 18;
+
+        // Update UI
+        this.updatePowerDot(false);
+        this.updateRemoteTempDisplay();
+        this.updateDeleteButtonState();
+
+        alert(
+          `✅ Device "${deviceName}" berhasil dihapus!\nESP32 akan restart.`
+        );
+      } catch (error) {
+        console.log(`🟥  Error mengirim delete request: ${error}`);
+        alert("❌ Gagal menghapus device!");
+      }
+    } else {
+      alert("❌ Tidak terhubung ke server!");
+    }
+  }
+
+  updateDeleteButtonState() {
+    if (this.deleteDeviceBtn) {
+      if (this.currentBrand && this.currentDeviceId) {
+        this.deleteDeviceBtn.disabled = false;
+      } else {
+        this.deleteDeviceBtn.disabled = true;
+      }
+    }
+  }
+
   setupDeviceSelector() {
     if (this.deviceSelector) {
-      this.deviceSelector.addEventListener("change", (e) => {
-        const [brand, deviceId] = e.target.value.split("|");
-        this.currentBrand = brand;
-        this.currentDeviceId = deviceId;
-        this.updateTopicDisplay();
-        console.log(`📱 Switched to ${brand}/${deviceId}`);
+      // Request device list ketika dropdown diklik/difokuskan
+      this.deviceSelector.addEventListener("focus", () => {
+        console.log("📋 Requesting device list from ESP32...");
+        this.requestDeviceListFromESP32();
+      });
 
-        // Reset state when switching devices
+      // Handle device selection change
+      this.deviceSelector.addEventListener("change", (e) => {
+        const selectedValue = e.target.value;
+
+        if (!selectedValue) {
+          this.currentBrand = null;
+          this.currentDeviceId = null;
+        } else {
+          const [brand, deviceId] = selectedValue.split("|");
+
+          // Kirim perintah switch device ke ESP32
+          this.switchDeviceOnESP32(brand, deviceId);
+
+          this.currentBrand = brand;
+          this.currentDeviceId = deviceId;
+        }
+
+        this.updateTopicDisplay();
+        this.updateDeleteButtonState();
+        console.log(
+          `📱 Switched to ${this.currentBrand}/${this.currentDeviceId}`
+        );
+
+        // Reset state ketika switching devices
         this.acPowerStatus = false;
-        this.remoteTempValue = 25;
+        this.remoteTempValue = 18;
         this.updatePowerDot(false);
         this.updateRemoteTempDisplay();
       });
     }
   }
 
+  // Request device list dari ESP32
+  requestDeviceListFromESP32() {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      const requestMessage = {
+        type: "request_devices",
+        timestamp: new Date().toISOString(),
+      };
+
+      try {
+        this.ws.send(JSON.stringify(requestMessage));
+        console.log("📤 Request device list sent to ESP32");
+
+        // Retry setelah 2 detik jika tidak ada response
+        setTimeout(() => {
+          if (this.availableDevices.length === 0) {
+            console.log("⚠️ No devices received, retrying...");
+            this.ws.send(JSON.stringify(requestMessage));
+          }
+        }, 2000);
+      } catch (error) {
+        console.log(`🟥  Error sending request: ${error}`);
+      }
+    }
+  }
+
+  // Switch device di ESP32
+  switchDeviceOnESP32(brand, deviceId) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      const switchMessage = {
+        type: "switch_device",
+        brand: brand,
+        deviceId: deviceId,
+        timestamp: new Date().toISOString(),
+      };
+
+      try {
+        this.ws.send(JSON.stringify(switchMessage));
+        console.log(`📤 Switch device command sent: ${brand}/${deviceId}`);
+      } catch (error) {
+        console.log(`🟥  Error sending switch command: ${error}`);
+      }
+    }
+  }
+
   updateTopicDisplay() {
     if (this.topicText && this.currentBrand && this.currentDeviceId) {
       this.topicText.textContent = `ac/${this.currentBrand}/${this.currentDeviceId}`;
+    } else {
+      this.topicText.textContent = "-";
     }
   }
 
@@ -73,22 +210,43 @@ class AirConditionerMonitor {
 
     if (!this.deviceSelector) return;
 
+    // Simpan device yang sedang dipilih
+    const currentSelection = this.deviceSelector.value;
+
     this.deviceSelector.innerHTML = '<option value="">Select Device</option>';
 
     devices.forEach((device) => {
       const option = document.createElement("option");
       option.value = `${device.brand}|${device.deviceId}`;
-      option.textContent = `${device.brand} - ${device.deviceId}`;
+      option.textContent = `${device.brand} - ${device.deviceId} (${
+        device.buttonCount || 0
+      } btn)`;
       this.deviceSelector.appendChild(option);
     });
 
-    // Auto-select first device if none selected
-    if (devices.length > 0 && !this.currentBrand) {
+    // Restore selection jika masih ada
+    if (
+      currentSelection &&
+      devices.find((d) => `${d.brand}|${d.deviceId}` === currentSelection)
+    ) {
+      this.deviceSelector.value = currentSelection;
+    } else if (devices.length > 0 && !this.currentBrand) {
+      // Auto pilih first device kalo gada yang dipilih
       this.currentBrand = devices[0].brand;
       this.currentDeviceId = devices[0].deviceId;
       this.deviceSelector.value = `${this.currentBrand}|${this.currentDeviceId}`;
       this.updateTopicDisplay();
+
+      // Auto switch ke device pertama di ESP32
+      this.switchDeviceOnESP32(this.currentBrand, this.currentDeviceId);
+    } else if (devices.length === 0) {
+      // No devices available
+      this.currentBrand = null;
+      this.currentDeviceId = null;
+      this.updateTopicDisplay();
     }
+
+    this.updateDeleteButtonState();
   }
 
   setupControlButtons() {
@@ -132,9 +290,9 @@ class AirConditionerMonitor {
     this.acPowerStatus = !this.acPowerStatus;
 
     if (this.acPowerStatus) {
-      this.remoteTempValue = 25;
+      this.remoteTempValue = 18;
       this.updateRemoteTempDisplay();
-      console.log("🔄 Suhu direset ke 25°C");
+      console.log("🔄 Suhu direset ke 18°C");
     }
 
     const command = this.acPowerStatus ? "ON" : "OFF";
@@ -250,7 +408,13 @@ class AirConditionerMonitor {
 
   connectWebsocketServer() {
     try {
-      this.ws = new WebSocket(`ws://${window.location.host}`);
+      const isProduction = window.location.hostname.includes("railway.app");
+      const protocol =
+        window.location.protocol === "https:" || isProduction ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${window.location.host}`;
+
+      console.log(`🔗 Connecting to: ${wsUrl}`);
+      this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
         console.log("🟩  Koneksi ke WebSocket Server berhasil");
@@ -263,6 +427,11 @@ class AirConditionerMonitor {
 
         // Request device list
         this.ws.send(JSON.stringify({ type: "get_devices" }));
+
+        // Request device list dari ESP32 juga
+        setTimeout(() => {
+          this.requestDeviceListFromESP32();
+        }, 500);
       };
 
 <<<<<<< HEAD
@@ -478,7 +647,7 @@ class AirConditionerMonitor {
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log("Berhasil parsing message");
+          console.log("Berhasil parsing message:", data);
           this.handleMessage(data);
         } catch (error) {
           console.log(`🟥  Terdapat error ketika parsing message: ${error}`);
@@ -608,7 +777,7 @@ class AirConditionerMonitor {
         }
         break;
       case "data":
-        // Only update if message is from currently selected device
+        // Hanya update jika message dari device yang sedang dipilih
         if (
           message.brand === this.currentBrand &&
           message.deviceId === this.currentDeviceId
@@ -632,7 +801,7 @@ class AirConditionerMonitor {
         }
         break;
       case "perintah_status":
-        // Only update if message is from currently selected device
+        // Hanya proses jika message dari device yang sedang dipilih
         if (
           message.brand === this.currentBrand &&
           message.deviceId === this.currentDeviceId
@@ -657,7 +826,7 @@ class AirConditionerMonitor {
       this.updatePowerDot(this.acPowerStatus);
 
       if (!this.acPowerStatus) {
-        this.remoteTempValue = 25;
+        this.remoteTempValue = 18;
         this.updateRemoteTempDisplay();
       }
     }
