@@ -8,6 +8,8 @@
 #include <IRutils.h>
 #include "DHT.h"
 #include <ArduinoJson.h>
+
+// Fitur Tambahan dari File 2
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -31,7 +33,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 // ===========================
 const char* ssid = "kentaki";
 const char* password = "12345678";
-const char* mqtt_broker = "34.46.216.209";
+const char* mqtt_broker = "34.67.229.30";
 const int mqtt_port = 1883;
 const char* mqtt_username = "esp32user";
 const char* mqtt_password = "windows10";
@@ -107,7 +109,7 @@ TombolIR currentDeviceButtons[MAX_BUTTONS_PER_DEVICE];
 // STATE & TIMERS
 // ===========================
 bool powerStatus = false;
-int currentTemp = 18; // Default start temp 
+int currentTemp = 18; // Default start temp (tengah-tengah 18-22)
 
 // Timers
 unsigned long lastDataSend = 0;
@@ -123,7 +125,7 @@ unsigned long lastHeartbeat = 0;
 const unsigned long HEARTBEAT_INTERVAL = 15000; 
 unsigned long lastReconnectAttempt = 0;
 
-// Auto-record state 
+// Auto-record state (DIMODIFIKASI UNTUK 16-20 DERAJAT)
 bool autoRecordMode = false;
 // Array nama tombol yang akan direkam:
 const char* autoRecordNames[7] = {
@@ -236,8 +238,8 @@ String getBrandFromProtocol(decode_type_t protocol) {
     case HITACHI_AC: return "hitachi";
     case FUJITSU_AC: return "fujitsu";
     case GREE: return "gree";
-    case UNKNOWN: return "unknown";  
-    default: return "generic";        
+    case UNKNOWN: return "unknown";  // TAMBAHAN: Handle UNKNOWN
+    default: return "generic";        // UBAH dari unknown ke generic
   }
 }
 
@@ -279,7 +281,7 @@ void saveDeviceList() {
     preferences.putString((prefix + "id").c_str(), devices[i].deviceId);
     preferences.putInt((prefix + "protocol").c_str(), (int)devices[i].protocol);
     preferences.putInt((prefix + "btnCount").c_str(), devices[i].buttonCount);
-    preferences.putUInt((prefix + "unique").c_str(), devices[i].uniqueCode);  
+    preferences.putUInt((prefix + "unique").c_str(), devices[i].uniqueCode);  // TAMBAHAN
   }
 
   preferences.end();
@@ -296,7 +298,7 @@ void loadDeviceList() {
     devices[i].deviceId = preferences.getString((prefix + "id").c_str(), "");
     devices[i].protocol = (decode_type_t)preferences.getInt((prefix + "protocol").c_str(), 0);
     devices[i].buttonCount = preferences.getInt((prefix + "btnCount").c_str(), 0);
-    devices[i].uniqueCode = preferences.getUInt((prefix + "unique").c_str(), 0); 
+    devices[i].uniqueCode = preferences.getUInt((prefix + "unique").c_str(), 0);  // TAMBAHAN
     devices[i].hasData = devices[i].buttonCount > 0;
   }
 
@@ -357,7 +359,7 @@ void loadDeviceButtons(int deviceIndex) {
 int findDeviceByProtocol(decode_type_t protocol) {
   for (int i = 0; i < totalDevices; i++) {
     if (devices[i].protocol == protocol) {
-      // Untuk UNKNOWN, cek juga uniqueCode
+      // TAMBAHAN: Untuk UNKNOWN, cek juga uniqueCode
       if (protocol == UNKNOWN) {
         // Jangan return dulu, lanjut cek uniqueCode di createNewDevice
         continue;
@@ -380,7 +382,7 @@ int addNewDevice(decode_type_t protocol) {
   String brand = getBrandFromProtocol(protocol);
   String deviceId = getDeviceIdFromProtocol(protocol);
   
-  // Untuk UNKNOWN, buat deviceId yang unik
+  // TAMBAHAN: Untuk UNKNOWN, buat deviceId yang unik
   if (protocol == UNKNOWN) {
     deviceId = "UNKNOWN_" + String(totalDevices);  // Buat ID unik per device
   }
@@ -390,7 +392,7 @@ int addNewDevice(decode_type_t protocol) {
   devices[totalDevices].protocol = protocol;
   devices[totalDevices].buttonCount = 0;
   devices[totalDevices].hasData = false;
-  devices[totalDevices].uniqueCode = 0;  // Init dengan 0
+  devices[totalDevices].uniqueCode = 0;  // TAMBAHAN: Init dengan 0
 
   int newIndex = totalDevices;
   totalDevices++;
@@ -497,7 +499,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   String command = doc["command"] | "";
   int temp = doc["temperature"] | 18;
 
-  // Handle system commands
+  // TAMBAHAN: Handle system commands
   if (type == "system") {
     if (command == "REQUEST_DEVICES") {
       Serial.println("📋 Received REQUEST_DEVICES from web");
@@ -590,7 +592,7 @@ void reconnectMQTT() {
         client.subscribe(mqttTopicCmd.c_str());
       }
       
-      // Publish device list setelah connect
+      // ✅ TAMBAHAN: Publish device list setelah connect
       if (totalDevices > 0) {
         delay(1000); // Tunggu koneksi stabil
         publishDeviceList();
@@ -644,7 +646,7 @@ void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t lengt
 
 
 // ===========================
-// COMMAND HANDLER 
+// COMMAND HANDLER (DIMODIFIKASI LOGIKANYA)
 // ===========================
 void sendIRButton(int btnIndex) {
   if (currentDeviceIndex < 0 || btnIndex < 0 || btnIndex >= devices[currentDeviceIndex].buttonCount) {
@@ -726,7 +728,7 @@ void handleCommand(String command, int temp) {
       oledMsg1 = "AC OFF";
     }
   } else if (command == "TEMP_UP" && powerStatus) {
-    // Batas Max 22
+    // Batas Max sekarang 22
     if (currentTemp < 22) {
       currentTemp++;
       int btnIndex = (currentTemp - 18) + 2;
@@ -744,7 +746,7 @@ void handleCommand(String command, int temp) {
         delay(1000);
     }
   } else if (command == "TEMP_DOWN" && powerStatus) {
-    // Batas Min 18
+    // Batas Min sekarang 18
     if (currentTemp > 18) {
       currentTemp--;
       
@@ -826,7 +828,7 @@ void publishDeviceList() {
   JsonArray devicesArray = doc.createNestedArray("devices");
   
   for (int i = 0; i < totalDevices; i++) {
-    JsonObject device = devicesArray.createNestedObject();  
+    JsonObject device = devicesArray.createNestedObject();  // ✅ PERBAIKAN: Ganti createObject() dengan createNestedObject()
     device["brand"] = devices[i].brand;
     device["deviceId"] = devices[i].deviceId;
     device["protocol"] = typeToString(devices[i].protocol);
@@ -967,10 +969,10 @@ void autoRecordIR() {
     unsigned long startTime = millis();
     bool received = false;
     
-    // Tambah validasi sinyal
+    // MODIFIKASI: Tambah validasi sinyal
     while (millis() - startTime < 5000) {  // 5 detik timeout
       if (irrecv.decode(&results)) {
-        // Cek apakah sinyal cukup panjang (minimal 20 data points)
+        // VALIDASI: Cek apakah sinyal cukup panjang (minimal 20 data points)
         if (results.rawlen > 20) {  // Filter noise yang terlalu pendek
           received = true;
           break;
@@ -986,7 +988,7 @@ void autoRecordIR() {
       Serial.printf("❌ Timeout! No signal received for %s\n", buttonName);
       showOLEDMessage("Timeout!", buttonName, "Skipped");
       delay(1500);
-      irrecv.resume(); // Resume sebelum continue
+      irrecv.resume(); // PENTING: Resume sebelum continue
       continue;
     }
     
@@ -1045,7 +1047,7 @@ void createNewDevice() {
   Serial.println("\n📡 Point remote and press ANY button to detect device...");
   showOLEDMessage("Create Device", "Press ANY button", "on remote...");
   
-  // Flush buffer dulu
+  // TAMBAHAN: Flush buffer dulu
   flushIRBuffer();
   
   while (!irrecv.decode(&results)) {
@@ -1054,15 +1056,15 @@ void createNewDevice() {
 
   decode_type_t protocol = results.decode_type;
   String brand = getBrandFromProtocol(protocol);
-  uint32_t uniqueCode = generateUniqueCode();  
+  uint32_t uniqueCode = generateUniqueCode();  // TAMBAHAN
   
   Serial.printf("Detected protocol: %s (%s)\n", typeToString(protocol).c_str(), brand.c_str());
-  Serial.printf("Unique Code: 0x%08X\n", uniqueCode);  
+  Serial.printf("Unique Code: 0x%08X\n", uniqueCode);  // TAMBAHAN
   
   showOLEDMessage("Detected:", brand.c_str(), typeToString(protocol).c_str());
   delay(2000);
 
-  // Cek existing device dengan unique code untuk UNKNOWN
+  // MODIFIKASI: Cek existing device dengan unique code untuk UNKNOWN
   int existingIndex = -1;
   
   if (protocol == UNKNOWN) {
@@ -1084,7 +1086,7 @@ void createNewDevice() {
   } else {
     int newIndex = addNewDevice(protocol);
     if (newIndex >= 0) {
-      devices[newIndex].uniqueCode = uniqueCode;  // Simpan unique code
+      devices[newIndex].uniqueCode = uniqueCode;  // TAMBAHAN: Simpan unique code
       saveDeviceList();  // Save lagi untuk update uniqueCode
       delay(500);
       publishDeviceList();
@@ -1257,14 +1259,14 @@ void deleteSingleDevice(String targetBrand, String targetDeviceId) {
   
   Serial.printf("✅ Found device at index %d\n", targetIndex);
   
-  // Hapus button data untuk device ini
+  // 1. Hapus button data untuk device ini
   String namespace_name = "ac_" + String(targetIndex);
   preferences.begin(namespace_name.c_str(), false);
   preferences.clear();
   preferences.end();
   Serial.printf("✅ Buttons cleared for device %d\n", targetIndex);
   
-  // Shift semua device setelahnya ke kiri
+  // 2. Shift semua device setelahnya ke kiri
   for (int i = targetIndex; i < totalDevices - 1; i++) {
     devices[i] = devices[i + 1];
     
@@ -1302,19 +1304,19 @@ void deleteSingleDevice(String targetBrand, String targetDeviceId) {
     preferences.end();
   }
   
-  // Hapus namespace terakhir (karena sudah shift)
+  // 3. Hapus namespace terakhir (karena sudah shift)
   String lastNamespace = "ac_" + String(totalDevices - 1);
   preferences.begin(lastNamespace.c_str(), false);
   preferences.clear();
   preferences.end();
   
-  // Update totalDevices
+  // 4. Update totalDevices
   totalDevices--;
   
-  // ave device list
+  // 5. Save device list
   saveDeviceList();
   
-  // Switch ke device lain atau reset
+  // 6. Switch ke device lain atau reset
   if (targetIndex == currentDeviceIndex) {
     if (totalDevices > 0) {
       switchToDevice(0); // Switch ke device pertama yang tersisa
@@ -1398,13 +1400,13 @@ void setup() {
 // LOOP
 // ===========================
 void loop() {
-  // Update state button & WebSocket 
+  // 1. Update state button & WebSocket (harus sering dipanggil)
   button.loop();
   webSocket.loop();
 
   unsigned long now = millis();
 
-  // Handle Button Press (Mode Setup/Record)
+  // 2. Handle Button Press (Mode Setup/Record)
   if (button.isPressed() && !autoRecordMode) {
     Serial.println("\n🔘 Button pressed! Starting device creation + auto-record...");
     
@@ -1423,9 +1425,9 @@ void loop() {
     printMenu(); 
   }
 
-  // MQTT Management (Non-blocking reconnect)
+  // 3. MQTT Management (Non-blocking reconnect)
   if (!client.connected()) {
-    // Reconnect setiap 5 detik
+    // Coba reconnect setiap 5 detik saja, jangan spamming setiap millisecond
     if (now - lastReconnectAttempt > 5000) {
       lastReconnectAttempt = now;
       Serial.println("⚠️ MQTT Disconnected. Attempting reconnect...");
@@ -1435,20 +1437,20 @@ void loop() {
     client.loop();
   }
 
-  // Heartbeat / Sensor Data 
+  // 4. Heartbeat / Sensor Data (PENTING: Hapus syarat currentDeviceIndex >= 0)
   // Agar server tetap menerima data (heartbeat) meskipun belum ada AC yang dipilih
   if (now - lastDataSend > DATA_SEND_INTERVAL) {
     sendSensorData();
     lastDataSend = now;
   }
 
-  // Auto-publish Device List (Backup agar web selalu sinkron)
+  // 5. Auto-publish Device List (Backup agar web selalu sinkron)
   if (totalDevices > 0 && now - lastDeviceListPublish > DEVICE_LIST_PUBLISH_INTERVAL) {
     publishDeviceList();
     lastDeviceListPublish = now;
   }
 
-  // Update OLED Display
+  // 6. Update OLED Display
   if (!autoRecordMode && now - lastDisplayUpdate > displayUpdateInterval) {
     lastDisplayUpdate = now;
     float t = dht.readTemperature();
@@ -1460,7 +1462,7 @@ void loop() {
     }
   }
 
-  // Serial Menu Handler
+  // 7. Serial Menu Handler
   if (Serial.available()) {
     // Hapus whitespace/newline sisa
     String input = Serial.readStringUntil('\n');
