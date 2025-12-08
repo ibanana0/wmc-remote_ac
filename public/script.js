@@ -219,7 +219,7 @@ class AirConditionerMonitor {
       const option = document.createElement("option");
       option.value = `${device.brand}|${device.deviceId}`;
       option.textContent = `${device.brand} - ${device.deviceId} (${
-        device.buttonCount || 0
+        device.buttonCount || 7
       } btn)`;
       this.deviceSelector.appendChild(option);
     });
