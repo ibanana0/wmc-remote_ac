@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - AC Monitor</title>
+
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style type="text/tailwindcss">
+        @theme {
+            --default-font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-black text-white min-h-screen">
+    <div class="max-w-md mx-auto px-6 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-2xl font-light tracking-tight">Register</h1>
+        </div>
+
+        <!-- Register Form -->
+        <form id="register-form" class="space-y-6">
+            <div>
+                <label for="username" class="text-xs text-gray-400 uppercase tracking-wider mb-2 block">Username</label>
+                <input type="text" id="username" class="w-full bg-white text-black px-4 py-3 rounded-none border-none focus:outline-none focus:ring-1 focus:ring-white" required>
+            </div>
+            
+            <div>
+                <label for="password" class="text-xs text-gray-400 uppercase tracking-wider mb-2 block">Password</label>
+                <input type="password" id="password" class="w-full bg-white text-black px-4 py-3 rounded-none border-none focus:outline-none focus:ring-1 focus:ring-white" required>
+            </div>
+
+            <!-- Messages -->
+            <div id="error-message" class="text-red-500 text-sm hidden"></div>
+            <div id="success-message" class="text-green-500 text-sm hidden"></div>
+
+            <!-- Register Button -->
+            <div class="border border-gray-800 p-6">
+                <button type="submit" class="w-full border-2 border-white py-3 text-white font-light uppercase tracking-wider hover:bg-white hover:text-black transition-all duration-300">
+                    Register
+                </button>
+            </div>
+        </form>
+
+        <!-- Login Link -->
+        <div class="mt-8 flex items-center justify-between border-t border-b border-gray-800 py-4">
+            <div>
+                <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Already Registered?</p>
+                <p class="text-sm font-light">Login to your account</p>
+            </div>
+            <a href="login.html" class="w-14 h-14 border border-gray-600 hover:border-white hover:bg-white hover:text-black transition-all duration-300 flex items-center justify-center">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('error-message');
+            const successDiv = document.getElementById('success-message');
+            
+            errorDiv.classList.add('hidden');
+            successDiv.classList.add('hidden');
+            
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    successDiv.textContent = 'Account created! Redirecting to login...';
+                    successDiv.classList.remove('hidden');
+                    setTimeout(() => {
+                        window.location.href = '/login.html';
+                    }, 1500);
+                } else {
+                    errorDiv.textContent = data.error;
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorDiv.textContent = 'Connection error';
+                errorDiv.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

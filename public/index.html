@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AC Monitor</title>
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login.html';
+        }
+    </script>
 
     <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#000000">
@@ -24,8 +30,10 @@
 <body class="bg-black text-white min-h-screen">
     <div class="max-w-md mx-auto px-6 py-8">
         <!-- Header -->
-        <div class="mb-8">
+        <!-- Header -->
+        <div class="mb-8 flex justify-between items-center">
             <h1 class="text-2xl font-light tracking-tight">AC Monitor</h1>
+            <button id="logout-btn" class="text-xs text-gray-400 hover:text-white uppercase tracking-wider transition-colors">Logout</button>
         </div>
 
         <!-- Device Selector -->
@@ -110,5 +118,12 @@
         </div>
     </div>
     <script src="script.js"></script>
+    <script>
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            window.location.href = '/login.html';
+        });
+    </script>
 </body>
 </html>
