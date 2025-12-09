@@ -1,4 +1,4 @@
-const mqtt = require("mqtt");
+   const mqtt = require("mqtt");
 const os = require("os");
 const WebSocket = require("ws");
 const express = require("express");
@@ -13,7 +13,7 @@ const SECRET_KEY = process.env.JWT_SECRET || "supersecretkey_ganti_nanti_ya";
 // Initialize DB
 initDatabase();
 
-const MQTT_BROKER = "34.67.229.30";
+const MQTT_BROKER = "34.68.90.205";
 const MQTT_PORT = 1883;
 const MQTT_URL = `mqtt://${MQTT_BROKER}:${MQTT_PORT}`;
 const WSS_PORT = 8080;
